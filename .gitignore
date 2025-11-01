@@ -1,0 +1,78 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker volumes
+postgres_data/
+synapse_data/
+
+# Environment variables
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.min.css
+
+# Cache
+.cache/
+.yarn/
+.npm/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Database backups
+*.sql
+*.db
+*.sqlite
+
+# Tokens and keys
+*token*.txt
+*.key
+*.pem
+
+# Synapse specific
+synapse-config/localhost.signing.key
+media_store/
+
+# Element Web build
+www/element-web/webapp/
+www/admin/dist/
+
+# JSON exports
+*messages*.json
+*room*.json

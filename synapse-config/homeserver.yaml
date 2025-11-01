@@ -1,0 +1,193 @@
+# Matrix Synapse Homeserver Configuration
+# =========================================
+
+# Sunucu adı (domain veya localhost)
+server_name: "localhost"
+
+# Public baseurl
+public_baseurl: "http://localhost:8008/"
+
+# PID file
+pid_file: /data/homeserver.pid
+
+# Listeners
+listeners:
+  # Client API
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::','0.0.0.0']
+    resources:
+      - names: [client, federation]
+        compress: false
+
+  # Federation API
+  - port: 8448
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::','0.0.0.0']
+    resources:
+      - names: [federation]
+
+# PostgreSQL Database
+database:
+  name: psycopg2
+  args:
+    user: synapse_user
+    password: SuperGucluSifre2024!
+    database: synapse
+    host: postgres
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+# Logging
+log_config: "/data/localhost.log.config"
+
+# Media Store
+media_store_path: /data/media_store
+max_upload_size: 50M
+max_image_pixels: 32M
+
+# Registration
+enable_registration: true
+enable_registration_without_verification: true
+registration_shared_secret: "GizliKayitAnahtari123456789"
+
+# Captcha (disabled for local)
+enable_registration_captcha: false
+
+# Guests
+allow_guest_access: false
+
+# Macaroon secret key
+macaroon_secret_key: "MacaroonGizliAnahtar987654321"
+
+# Form secret
+form_secret: "FormGizliAnahtar123456789"
+
+# Signing keys
+signing_key_path: "/data/localhost.signing.key"
+
+# Trusted key servers
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+# Redis
+redis:
+  enabled: true
+  host: redis
+  port: 6379
+
+# Email notifications (disabled)
+# email:
+#   enable_notifs: false
+
+# Turn server (disabled)
+turn_uris: []
+turn_shared_secret: ""
+
+# Presence
+presence:
+  enabled: true
+
+# User directory
+user_directory:
+  enabled: true
+  search_all_users: true
+
+# URL preview (enabled)
+url_preview_enabled: true
+url_preview_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/64'
+  - 'fc00::/7'
+
+# CORS
+web_client_location: "http://localhost:8080"
+
+# Admin contact
+admin_contact: 'mailto:admin@localhost'
+
+# Federation
+federation_domain_whitelist: []
+
+# Retention
+retention:
+  enabled: false
+
+# Stats
+report_stats: false
+
+# Encryption - TAMAMEN DEVRE DIŞI
+# Admin mesajları görebilsin diye
+encryption_enabled_by_default_for_room_type: off
+
+# Şifrelemeyi tamamen engelle
+enable_e2ee_auto_rotation: false
+
+# Auto-join rooms
+auto_join_rooms: []
+
+# Default room settings - yeni odalar public olsun
+default_room_version: "10"
+
+# Suppress key server warning
+suppress_key_server_warning: true
+
+# Worker mode (disabled)
+send_federation: true
+start_pushers: true
+
+# Rate Limiting (Daha esnek - development için)
+rc_message:
+  per_second: 1000
+  burst_count: 2000
+
+rc_registration:
+  per_second: 100
+  burst_count: 200
+
+rc_login:
+  address:
+    per_second: 100
+    burst_count: 300
+  account:
+    per_second: 100
+    burst_count: 300
+  failed_attempts:
+    per_second: 50
+    burst_count: 100
+
+rc_admin_redaction:
+  per_second: 100
+  burst_count: 200
+
+rc_joins:
+  local:
+    per_second: 100
+    burst_count: 200
+  remote:
+    per_second: 100
+    burst_count: 200
+
+rc_3pid_validation:
+  per_second: 100
+  burst_count: 200
+
+rc_invites:
+  per_room:
+    per_second: 100
+    burst_count: 200
+  per_user:
+    per_second: 100
+    burst_count: 200
+

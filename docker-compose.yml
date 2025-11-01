@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Veritabanı
+  postgres:
+    image: postgres:15-alpine
+    container_name: matrix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - matrix-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse_user -d synapse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: matrix-redis
+    restart: unless-stopped
+    networks:
+      - matrix-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Matrix Synapse Sunucusu
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: matrix-synapse
+    restart: unless-stopped
+    ports:
+      - "8008:8008"  # HTTP API
+      - "8448:8448"  # Federation (diğer Matrix sunucularıyla iletişim)
+    environment:
+      SYNAPSE_SERVER_NAME: ${SYNAPSE_SERVER_NAME:-localhost}
+      SYNAPSE_REPORT_STATS: "no"
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+      POSTGRES_HOST: postgres
+    volumes:
+      - synapse_data:/data
+      - ./synapse-config/homeserver.yaml:/data/homeserver.yaml
+      - ./synapse-config/localhost.log.config:/data/localhost.log.config
+    networks:
+      - matrix-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Synapse Admin Panel (mevcut projenle entegre)
+  synapse-admin:
+    build:
+      context: ./www/admin
+    container_name: synapse-admin-ui
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    networks:
+      - matrix-network
+    depends_on:
+      - synapse
+
+networks:
+  matrix-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  synapse_data:
+    driver: local
+
