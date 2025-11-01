@@ -76,3 +76,9 @@ www/admin/dist/
 # JSON exports
 *messages*.json
 *room*.json
+
+# Railway
+.railway/
+
+# Vercel
+.vercel/
