@@ -1,21 +1,31 @@
-# Production Dockerfile - Use pre-built dist folder
-# This avoids git version issues during Docker build
+# Production Dockerfile for Synapse Admin
+FROM node:20-alpine AS build
 
-FROM nginx:stable-alpine
+WORKDIR /app
 
-# Copy pre-built admin panel
-COPY dist /app
+# Copy package files
+COPY package*.json ./
+RUN npm ci
 
-# Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy source
+COPY . .
 
-# Create symlink
-RUN rm -rf /usr/share/nginx/html && \
-    ln -s /app /usr/share/nginx/html
+# Build
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Copy built files
+COPY --from=build /app/dist ./dist
+
+# Install vite globally for preview
+RUN npm install -g vite
 
 # Expose port
-EXPOSE 80
+EXPOSE 3000
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
-
+# Start with vite preview
+CMD ["sh", "-c", "vite preview --host 0.0.0.0 --port ${PORT:-3000}"]

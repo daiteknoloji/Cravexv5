@@ -1,25 +1,28 @@
-# Railway Dockerfile for Matrix Synapse
-FROM matrixdotorg/synapse:latest
+# Multi-stage Dockerfile for Synapse Admin
+FROM node:20-alpine AS build
 
-# Set working directory
-WORKDIR /data
+WORKDIR /app
 
-# Copy config template
-COPY synapse-config/homeserver.yaml /data/homeserver.yaml
+# Copy package files
+COPY www/admin/package*.json ./
+RUN npm ci
 
-# Create startup script
-RUN printf '#!/bin/bash\n\
-set -e\n\
-echo "Starting Matrix Synapse..."\n\
-exec python -m synapse.app.homeserver -c /data/homeserver.yaml\n' > /start.sh \
-    && chmod +x /start.sh
+# Copy source
+COPY www/admin ./
 
-# Healthcheck disabled - server takes time for DB migrations
-# Railway will use port 8008 availability instead
+# Build
+RUN npm run build
 
-EXPOSE 8008
+# Production stage
+FROM node:20-alpine AS runner
 
-# Use bash directly
-ENTRYPOINT ["/bin/bash"]
-CMD ["/start.sh"]
+WORKDIR /app
 
+# Copy built files
+COPY --from=build /app/dist ./dist
+
+# Expose port
+EXPOSE 3000
+
+# Start with vite preview
+CMD ["sh", "-c", "npx vite preview --host 0.0.0.0 --port ${PORT:-3000}"]

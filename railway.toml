@@ -3,6 +3,7 @@ builder = "NIXPACKS"
 
 [variables]
 NIXPACKS_NODE_VERSION = "20"
+NIXPACKS_LOG_LEVEL = "debug"
 
 [deploy]
 startCommand = "npm run preview"
