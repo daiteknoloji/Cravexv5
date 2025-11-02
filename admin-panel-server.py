@@ -23,9 +23,9 @@ import os
 
 DB_CONFIG = {
     'host': os.getenv('PGHOST', 'localhost'),
-    'database': os.getenv('PGDATABASE', 'railway'),
-    'user': os.getenv('PGUSER', 'postgres'),
-    'password': os.getenv('PGPASSWORD', ''),
+    'database': os.getenv('PGDATABASE', 'synapse'),
+    'user': os.getenv('PGUSER', 'synapse_user'),
+    'password': os.getenv('PGPASSWORD', 'SuperGucluSifre2024!'),
     'port': int(os.getenv('PGPORT', '5432'))
 }
 
