@@ -52,11 +52,8 @@ enable_metrics: false
 report_stats: false
 
 ## API Configuration ##
-room_prejoin_state:
-  - "m.room.join_rules"
-  - "m.room.canonical_alias"
-  - "m.room.avatar"
-  - "m.room.name"
+# room_invite_state_types removed to avoid deprecated warnings
+# room_prejoin_state has complex format, leaving it out for simplicity
 
 app_service_config_files: []
 
