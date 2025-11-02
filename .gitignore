@@ -69,9 +69,9 @@ ENV/
 synapse-config/localhost.signing.key
 media_store/
 
-# Element Web build
-www/element-web/webapp/
-www/admin/dist/
+# Element Web build - tüm içerik dahil edildi
+# www/element-web/webapp/
+# www/admin/dist/
 
 # JSON exports
 *messages*.json
