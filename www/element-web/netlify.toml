@@ -1,13 +1,18 @@
 [build]
-  # Build command
-  command = "yarn build"
+  # Build command - yarn commands only
+  command = "yarn install && yarn build"
   
   # Output directory  
   publish = "webapp"
   
+  # Base directory
+  base = "."
+  
   # Environment
   [build.environment]
     NODE_VERSION = "18"
+    # Skip git submodules
+    GIT_SUBMODULE_STRATEGY = "none"
 
 # Redirect rules for SPA
 [[redirects]]
