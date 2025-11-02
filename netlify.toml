@@ -1,0 +1,29 @@
+# Netlify Configuration for Element-web deployment
+# This file is at the root level to control submodule behavior
+
+[build]
+  # Base directory for Element-web
+  base = "www/element-web"
+  
+  # Build command
+  command = "yarn install && yarn build"
+  
+  # Output directory  
+  publish = "webapp"
+  
+  # Ignore git submodules completely - they cause deployment failures
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
+
+[build.environment]
+  # Node version
+  NODE_VERSION = "18"
+  
+  # Disable git submodules
+  GIT_LFS_ENABLED = "false"
+
+# Redirect rules for SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
