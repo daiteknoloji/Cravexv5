@@ -14,9 +14,8 @@ echo "Starting Matrix Synapse..."\n\
 exec python -m synapse.app.homeserver -c /data/homeserver.yaml\n' > /start.sh \
     && chmod +x /start.sh
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8008/health || exit 1
+# Healthcheck disabled - server takes time for DB migrations
+# Railway will use port 8008 availability instead
 
 EXPOSE 8008
 
