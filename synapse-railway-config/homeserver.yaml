@@ -20,6 +20,8 @@ listeners:
 ## Database ##
 database:
   name: psycopg2
+  txn_limit: 10000
+  allow_unsafe_locale: true
   args:
     user: postgres
     password: changeme
