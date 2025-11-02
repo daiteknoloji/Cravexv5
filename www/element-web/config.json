@@ -1,8 +1,8 @@
 {
     "default_server_config": {
         "m.homeserver": {
-            "base_url": "https://cravexv5-production.up.railway.app",
-            "server_name": "cravexv5-production.up.railway.app"
+            "base_url": "https://matrix-synapse-production.up.railway.app",
+            "server_name": "matrix-synapse-production.up.railway.app"
         }
     },
     "disable_custom_urls": false,
@@ -23,7 +23,7 @@
     "default_federate": true,
     "default_theme": "light",
     "room_directory": {
-        "servers": ["cravexv5-production.up.railway.app"]
+        "servers": ["matrix-synapse-production.up.railway.app"]
     },
     "jitsi": {
         "preferred_domain": "meet.jit.si"
