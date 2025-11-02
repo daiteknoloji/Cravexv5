@@ -7,11 +7,12 @@ export default defineConfig({
   base: "./",
   plugins: [
     react(),
-    vitePluginVersionMark({
-      command: "git describe --tags",
-      ifMeta: true,
-      ifLog: true,
-      ifGlobal: true,
-    }),
+    // Git komutu Railway'de çalışmıyor, plugin devre dışı
+    // vitePluginVersionMark({
+    //   command: "git describe --tags",
+    //   ifMeta: true,
+    //   ifLog: true,
+    //   ifGlobal: true,
+    // }),
   ],
 });
