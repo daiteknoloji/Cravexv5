@@ -18,13 +18,15 @@ from functools import wraps
 app = Flask(__name__)
 app.secret_key = 'cravex-admin-secret-key-2024'
 
-# PostgreSQL bağlantısı
+# PostgreSQL bağlantısı - Railway ortam değişkenlerinden
+import os
+
 DB_CONFIG = {
-    'host': 'localhost',
-    'database': 'synapse',
-    'user': 'synapse_user',
-    'password': 'SuperGucluSifre2024!',
-    'port': 5432
+    'host': os.getenv('PGHOST', 'localhost'),
+    'database': os.getenv('PGDATABASE', 'railway'),
+    'user': os.getenv('PGUSER', 'postgres'),
+    'password': os.getenv('PGPASSWORD', ''),
+    'port': int(os.getenv('PGPORT', '5432'))
 }
 
 # Admin kullanıcı bilgileri
@@ -1213,4 +1215,5 @@ if __name__ == '__main__':
     print("=" * 60)
     print("")
     
-    app.run(host='0.0.0.0', port=9000, debug=False)
+    port = int(os.getenv('PORT', '9000'))
+    app.run(host='0.0.0.0', port=port, debug=False)
