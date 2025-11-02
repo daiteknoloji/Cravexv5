@@ -1,0 +1,60 @@
+/* =============================================
+   ŞİFRELEME UI'SINI TAMAMEN GİZLE
+   ============================================= */
+
+/* "Enable end-to-end encryption" toggle'ını gizle */
+.mx_Field[id*="encryption"],
+.mx_Field label:has(input[id*="encryption"]),
+div[class*="encryption"] label,
+input[type="checkbox"][id*="encryption"],
+label:has(input[id*="enableEncryption"]),
+.mx_CreateRoomDialog_settingsSection:has(input[id*="encryption"]) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* "Show advanced" linkini gizle (encryption ile ilgili) */
+.mx_CreateRoomDialog_advanced,
+.mx_CreateRoomDialog_showAdvanced {
+    display: none !important;
+}
+
+/* Encryption warning mesajını gizle */
+div:has(> .mx_Field input[id*="encryption"]) > .mx_Field_description,
+.mx_CreateRoomDialog_encryptionWarning {
+    display: none !important;
+}
+
+/* Room settings'de encryption bölümünü gizle */
+.mx_SettingsTab_section:has(span:contains("Encryption")),
+.mx_SettingsTab_section label:contains("encryption"),
+.mx_SettingsFieldset:has(span:contains("Encryption")) {
+    display: none !important;
+}
+
+/* Security & Privacy'de encryption ayarlarını gizle */
+div[role="tabpanel"] .mx_SettingsTab_section:nth-child(n):has(input[type="checkbox"][id*="crypto"]) {
+    display: none !important;
+}
+
+/* Genel encryption UI elementlerini gizle */
+[data-test-id*="encryption"],
+[aria-label*="encryption"],
+[aria-label*="Encryption"] {
+    display: none !important;
+}
+
+/* Room create dialog - encryption checkbox container */
+.mx_Checkbox:has(input[id*="enableEncryption"]) {
+    display: none !important;
+}
+
+/* Oda ayarlarında encryption badge'lerini gizle */
+.mx_E2EIcon,
+.mx_EventTile_e2eIcon,
+.mx_RoomSummaryCard_e2ee {
+    display: none !important;
+}
+

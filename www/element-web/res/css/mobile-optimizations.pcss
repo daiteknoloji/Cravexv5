@@ -1,0 +1,222 @@
+/*
+ * Mobile Optimizations for Element Web
+ * Custom CSS for better mobile browser experience
+ */
+
+/* Mobile-specific styles - activate on screens 768px and below */
+@media only screen and (max-width: 768px) {
+    /* Fix body and html for mobile */
+    html, body {
+        width: 100% !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        -webkit-text-size-adjust: 100% !important;
+    }
+
+    /* Main container fixes */
+    #matrixchat {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Make input fields touch-friendly */
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="search"],
+    textarea {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        border-radius: 4px !important;
+        padding: 12px !important;
+        touch-action: manipulation !important;
+        min-height: 44px !important; /* Apple's recommended touch target */
+    }
+
+    /* Fix message composer */
+    .mx_MessageComposer {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .mx_MessageComposer_wrapper {
+        padding: 8px !important;
+    }
+
+    .mx_BasicMessageComposer {
+        font-size: 16px !important; /* Prevents zoom */
+        min-height: 44px !important;
+        padding: 12px !important;
+    }
+
+    /* Fix room list */
+    .mx_LeftPanel {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .mx_RoomList {
+        width: 100% !important;
+    }
+
+    /* Make buttons touch-friendly */
+    button,
+    .mx_AccessibleButton {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        touch-action: manipulation !important;
+        cursor: pointer !important;
+    }
+
+    /* Fix timeline/message area */
+    .mx_RoomView_body {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    .mx_EventTile {
+        max-width: 100% !important;
+        overflow-wrap: break-word !important;
+        word-wrap: break-word !important;
+    }
+
+    /* Fix scrolling */
+    .mx_ScrollPanel {
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Responsive typography */
+    .mx_EventTile_content {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Fix dialog/modal on mobile */
+    .mx_Dialog {
+        max-width: 95vw !important;
+        max-height: 90vh !important;
+        margin: 5vh auto !important;
+    }
+
+    /* Fix settings panel */
+    .mx_TabbedView_tabPanel {
+        width: 100% !important;
+        margin-left: 0 !important;
+        padding: 8px !important;
+    }
+
+    /* Hide unnecessary elements on mobile */
+    .mx_RoomHeader_buttons .mx_RoomHeader_button {
+        padding: 8px !important;
+    }
+
+    /* Make sure images fit screen */
+    .mx_MImageBody {
+        max-width: 100% !important;
+    }
+
+    .mx_MImageBody img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    /* Fix auth/login page */
+    .mx_AuthPage {
+        padding: 12px !important;
+    }
+
+    .mx_AuthBody {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 16px !important;
+    }
+
+    /* Prevent double-tap zoom */
+    * {
+        touch-action: manipulation !important;
+    }
+
+    /* Fix room header */
+    .mx_RoomHeader {
+        flex-wrap: wrap !important;
+        padding: 8px !important;
+    }
+
+    /* Make search input mobile-friendly */
+    .mx_SearchBar input {
+        font-size: 16px !important;
+        min-height: 44px !important;
+    }
+
+    /* Fix user menu */
+    .mx_UserMenu {
+        padding: 8px !important;
+    }
+}
+
+/* Extra small screens - phones in portrait */
+@media only screen and (max-width: 480px) {
+    /* Further adjustments for very small screens */
+    .mx_LeftPanel {
+        min-width: 100% !important;
+    }
+
+    /* Stack elements vertically */
+    .mx_RoomView_wrapper {
+        flex-direction: column !important;
+    }
+
+    /* Reduce padding on small screens */
+    .mx_EventTile {
+        padding: 8px 12px !important;
+    }
+
+    /* Make composer more compact */
+    .mx_MessageComposer_wrapper {
+        padding: 4px !important;
+    }
+
+    /* Smaller font for very small screens */
+    body {
+        font-size: 14px !important;
+    }
+}
+
+/* Landscape mode on mobile */
+@media only screen and (max-height: 500px) and (orientation: landscape) {
+    /* Optimize for landscape */
+    .mx_LeftPanel {
+        max-width: 250px !important;
+    }
+
+    .mx_RoomHeader {
+        min-height: 48px !important;
+    }
+}
+
+/* Touch-specific improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* This targets touch devices */
+    
+    /* Larger touch targets */
+    .mx_AccessibleButton,
+    button,
+    a {
+        min-height: 44px !important;
+        min-width: 44px !important;
+    }
+
+    /* Remove hover effects on touch devices */
+    .mx_EventTile:hover {
+        background-color: inherit !important;
+    }
+
+    /* Better scrolling */
+    * {
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+

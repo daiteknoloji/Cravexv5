@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Element - Şifreleme Devre Dışı</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        /* Element yüklendikten sonra CSS inject et */
+        #element-frame {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <iframe id="element-frame" src="index.html"></iframe>
+    
+    <script>
+        // Element iframe'i yüklendikten sonra CSS inject et
+        const frame = document.getElementById('element-frame');
+        
+        frame.onload = function() {
+            try {
+                const iframeDoc = frame.contentDocument || frame.contentWindow.document;
+                
+                // Custom CSS ekle
+                const style = iframeDoc.createElement('style');
+                style.textContent = `
+                    /* ŞİFRELEME TOGGLE'INI GİZLE */
+                    .mx_Field:has(input[id*="enableEncryption"]),
+                    .mx_Checkbox:has(input[id*="enableEncryption"]),
+                    label:has(input[id*="enableEncryption"]),
+                    div:has(> label > input[id*="enableEncryption"]) {
+                        display: none !important;
+                    }
+                    
+                    /* Show Advanced linkini gizle */
+                    .mx_CreateRoomDialog_advanced,
+                    a:contains("Gelişmiş göster"),
+                    a:contains("Show advanced") {
+                        display: none !important;
+                    }
+                    
+                    /* Encryption icon'ları gizle */
+                    .mx_E2EIcon,
+                    .mx_EventTile_e2eIcon {
+                        display: none !important;
+                    }
+                `;
+                
+                iframeDoc.head.appendChild(style);
+                console.log('✅ Şifreleme UI\'sı gizlendi!');
+            } catch (e) {
+                console.warn('CSS inject edilemedi:', e);
+            }
+        };
+    </script>
+</body>
+</html>
+

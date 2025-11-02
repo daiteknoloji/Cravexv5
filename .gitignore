@@ -1,4 +1,4 @@
-# Node modules
+# Node modules - sadece bunlar ignore
 node_modules/
 **/node_modules/
 
@@ -35,18 +35,18 @@ desktop.ini
 tmp/
 temp/
 
-# Build outputs
-dist/
-build/
-*.min.js
-*.min.css
+# Build outputs - Cravexv6 için dahil edildi
+# dist/
+# build/
+# *.min.js
+# *.min.css
 
-# Cache
-.cache/
-.yarn/
-.npm/
+# Cache - Cravexv6 için dahil edildi
+# .cache/
+# .yarn/
+# .npm/
 
-# Python
+# Python - venv çok büyük, ignore
 __pycache__/
 *.py[cod]
 *$py.class
