@@ -17,14 +17,16 @@ RUN pip install --no-cache-dir \
     flask \
     flask-cors \
     matrix-nio \
-    aiohttp
+    aiohttp \
+    psycopg2-binary
 
 # Expose port
-EXPOSE 5000
+EXPOSE 9000
 
 # Environment variables will be set in Railway
 ENV FLASK_APP=admin-panel-server.py
 ENV PYTHONUNBUFFERED=1
+ENV PORT=9000
 
 # Start command
 CMD ["python", "-u", "admin-panel-server.py"]
