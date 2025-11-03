@@ -1571,7 +1571,20 @@ def get_users():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        query = """
+        # Check if shadow_banned and locked columns exist (may not exist in older Synapse versions)
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name IN ('shadow_banned', 'locked')
+        """)
+        existing_cols = [row[0] for row in cur.fetchall()]
+        has_shadow_banned = 'shadow_banned' in existing_cols
+        has_locked = 'locked' in existing_cols
+        
+        shadow_col = 'u.shadow_banned' if has_shadow_banned else 'false as shadow_banned'
+        locked_col = 'u.locked' if has_locked else 'false as locked'
+        
+        query = f"""
             SELECT 
                 u.name,
                 u.admin,
@@ -1581,8 +1594,8 @@ def get_users():
                 (SELECT COUNT(DISTINCT room_id) FROM room_memberships 
                  WHERE user_id = u.name AND membership = 'join') as room_count,
                 (SELECT COUNT(*) FROM access_tokens WHERE user_id = u.name) as token_count,
-                u.shadow_banned,
-                u.locked
+                {shadow_col},
+                {locked_col}
             FROM users u
             WHERE u.deactivated = 0
             ORDER BY u.admin DESC, u.name;
@@ -1593,11 +1606,23 @@ def get_users():
         
         users = []
         for row in rows:
+            # Handle timestamp (can be in milliseconds or seconds)
+            created_str = ''
+            if row[3]:
+                try:
+                    # Try milliseconds first (Synapse format)
+                    if row[3] > 10000000000:  # Milliseconds
+                        created_str = datetime.fromtimestamp(row[3] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                    else:  # Seconds
+                        created_str = datetime.fromtimestamp(row[3]).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception as ts_err:
+                    created_str = str(row[3])
+            
             users.append({
                 'user_id': row[0],
                 'admin': bool(row[1]),
                 'deactivated': bool(row[2]),
-                'created': datetime.fromtimestamp(row[3]).strftime('%Y-%m-%d %H:%M:%S') if row[3] else '',
+                'created': created_str,
                 'displayname': row[4],
                 'room_count': row[5] or 0,
                 'active_sessions': row[6] or 0,
@@ -1612,7 +1637,9 @@ def get_users():
         
     except Exception as e:
         print(f"[HATA] /api/users - {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'details': traceback.format_exc()}), 500
 
 @app.route('/api/users/<user_id>/details')
 @login_required
