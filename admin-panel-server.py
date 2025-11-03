@@ -1833,12 +1833,13 @@ def create_user():
         cur.execute("""
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name IN ('locked', 'suspended', 'approved')
+            WHERE table_name = 'users' AND column_name IN ('locked', 'suspended', 'approved', 'shadow_banned')
         """)
         existing_user_cols = [row[0] for row in cur.fetchall()]
         has_locked = 'locked' in existing_user_cols
         has_suspended = 'suspended' in existing_user_cols
         has_approved = 'approved' in existing_user_cols
+        has_shadow_banned = 'shadow_banned' in existing_user_cols
         
         # Build INSERT query with available columns
         base_cols = "name, password_hash, creation_ts, admin, is_guest, deactivated"
@@ -1857,6 +1858,10 @@ def create_user():
             base_cols += ", approved"
             base_vals += ", %s"
             params.append(True)
+        if has_shadow_banned:
+            base_cols += ", shadow_banned"
+            base_vals += ", %s"
+            params.append(False)
         
         insert_query = f"""
             INSERT INTO users ({base_cols})
