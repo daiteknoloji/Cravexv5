@@ -1785,6 +1785,8 @@ def create_user():
                 # Matrix API available - use it
                 import requests
                 
+                print(f"[DEBUG] Admin token found: {admin_token[:20]}...")
+                
                 headers = {
                     'Authorization': f'Bearer {admin_token}',
                     'Content-Type': 'application/json'
@@ -1799,7 +1801,10 @@ def create_user():
                 # Use Synapse URL (localhost for local, Railway URL for production)
                 synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
                 api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
+                
+                print(f"[DEBUG] Calling Synapse API: {api_url}")
                 response = requests.put(api_url, headers=headers, json=user_data, timeout=10)
+                print(f"[DEBUG] Synapse API response: {response.status_code} - {response.text[:100]}")
                 
                 if response.status_code == 200 or response.status_code == 201:
                     return jsonify({
@@ -1807,6 +1812,8 @@ def create_user():
                         'user_id': user_id,
                         'message': 'User created successfully via Matrix API!'
                     })
+                else:
+                    print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
         except Exception as api_error:
             print(f"[INFO] Matrix API not available, using database fallback: {api_error}")
         
