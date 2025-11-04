@@ -1,4 +1,4 @@
-# Admin Panel Dockerfile for Railway
+# Admin Panel Dockerfile for Railway (Updated: 2025-11-03)
 FROM python:3.11-slim
 
 # Set working directory
