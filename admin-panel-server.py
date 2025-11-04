@@ -1002,7 +1002,10 @@ def get_messages():
     try:
         room_id = request.args.get('room_id', '').strip()
         sender = request.args.get('sender', '').strip()
+        receiver = request.args.get('receiver', '').strip()
         search = request.args.get('search', '').strip()
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
         page = int(request.args.get('page', 1))
         page_size = int(request.args.get('page_size', 50))
         
@@ -1014,11 +1017,40 @@ def get_messages():
         conditions = ["e.type = 'm.room.message'"]
         
         if room_id:
-            conditions.append(cur.mogrify("e.room_id = %s", (room_id,)).decode('utf-8'))
+            # Search both in room_id and room_name
+            conditions.append(f"""
+                (e.room_id ILIKE {cur.mogrify('%s', (f'%{room_id}%',)).decode('utf-8')}
+                 OR EXISTS (
+                    SELECT 1 FROM event_json ej_name
+                    WHERE ej_name.room_id = e.room_id
+                      AND ej_name.json::json->>'type' = 'm.room.name'
+                      AND ej_name.json::json->'content'->>'name' ILIKE {cur.mogrify('%s', (f'%{room_id}%',)).decode('utf-8')}
+                 ))
+            """)
         if sender:
             conditions.append(cur.mogrify("e.sender ILIKE %s", (f'%{sender}%',)).decode('utf-8'))
+        if receiver:
+            # Filter by recipient (member in room)
+            conditions.append(f"""
+                EXISTS (
+                    SELECT 1 FROM room_memberships rm
+                    WHERE rm.room_id = e.room_id
+                      AND rm.user_id ILIKE {cur.mogrify('%s', (f'%{receiver}%',)).decode('utf-8')}
+                      AND rm.user_id != e.sender
+                      AND rm.membership = 'join'
+                )
+            """)
         if search:
             conditions.append(cur.mogrify("ej.json::json->'content'->>'body' ILIKE %s", (f'%{search}%',)).decode('utf-8'))
+        if start_date:
+            # Convert datetime-local to timestamp (milliseconds)
+            from datetime import datetime
+            start_ts = int(datetime.fromisoformat(start_date).timestamp() * 1000)
+            conditions.append(cur.mogrify("e.origin_server_ts >= %s", (start_ts,)).decode('utf-8'))
+        if end_date:
+            from datetime import datetime
+            end_ts = int(datetime.fromisoformat(end_date).timestamp() * 1000)
+            conditions.append(cur.mogrify("e.origin_server_ts <= %s", (end_ts,)).decode('utf-8'))
         
         where_clause = " AND ".join(conditions)
         

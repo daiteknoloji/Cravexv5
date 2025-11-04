@@ -1083,14 +1083,39 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
                                 <div class="form-group">
-                                    <label class="form-label">Oda ID</label>
-                                    <input type="text" class="form-input" id="filterRoomId" placeholder="!abc:localhost">
+                                    <label class="form-label">Tarih Aralığı (Başlangıç)</label>
+                                    <input type="datetime-local" class="form-input" id="filterStartDate">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Tarih Aralığı (Bitiş)</label>
+                                    <input type="datetime-local" class="form-input" id="filterEndDate">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Hızlı Tarih Seçimi</label>
+                                    <select class="form-input" id="quickDateFilter" onchange="applyQuickDateFilter()">
+                                        <option value="">Manuel</option>
+                                        <option value="1h">Son 1 Saat</option>
+                                        <option value="1d">Son 1 Gün</option>
+                                        <option value="1w">Son 1 Hafta</option>
+                                        <option value="1m">Son 1 Ay</option>
+                                        <option value="all">Tüm Zamanlar</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">
+                                <div class="form-group">
+                                    <label class="form-label">Oda</label>
+                                    <input type="text" class="form-input" id="filterRoomId" placeholder="Oda adı veya ID">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Gönderen</label>
-                                    <input type="text" class="form-input" id="filterSender" placeholder="@user:localhost">
+                                    <input type="text" class="form-input" id="filterSender" placeholder="@user:domain">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Alıcı</label>
+                                    <input type="text" class="form-input" id="filterReceiver" placeholder="@user:domain">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Mesaj İçinde Ara</label>
@@ -1099,7 +1124,7 @@
                             </div>
                             <div class="flex gap-2">
                                 <button class="btn btn-primary" onclick="searchMessages()">
-                                    <i class="fas fa-search"></i> Ara
+                                    <i class="fas fa-search"></i> Filtrele
                                 </button>
                                 <button class="btn btn-secondary" onclick="exportData('json')">
                                     <i class="fas fa-download"></i> JSON
@@ -1108,7 +1133,7 @@
                                     <i class="fas fa-file-csv"></i> CSV
                                 </button>
                                 <button class="btn btn-secondary" onclick="clearFilters()">
-                                    <i class="fas fa-redo"></i> Temizle
+                                    <i class="fas fa-times"></i> Temizle
                                 </button>
                             </div>
                         </div>
@@ -2211,7 +2236,7 @@
         
         // Messages (full implementation)
         let messagePage = 1;
-        let messagePageSize = 50;
+        let messagePageSize = 20;
         let messageTotalPages = 1;
         
         async function searchMessages() {
@@ -2226,7 +2251,10 @@
             const params = new URLSearchParams({
                 room_id: document.getElementById('filterRoomId').value,
                 sender: document.getElementById('filterSender').value,
+                receiver: document.getElementById('filterReceiver').value || '',
                 search: document.getElementById('searchQuery').value,
+                start_date: document.getElementById('filterStartDate').value || '',
+                end_date: document.getElementById('filterEndDate').value || '',
                 page: messagePage,
                 page_size: messagePageSize
             });
@@ -2337,9 +2365,56 @@
             window.location.href = '/api/export?' + params;
         }
         
+        function applyQuickDateFilter() {
+            const quickFilter = document.getElementById('quickDateFilter').value;
+            const now = new Date();
+            
+            if (quickFilter === 'all') {
+                document.getElementById('filterStartDate').value = '';
+                document.getElementById('filterEndDate').value = '';
+                return;
+            }
+            
+            if (!quickFilter) return;
+            
+            let startDate = new Date();
+            
+            switch(quickFilter) {
+                case '1h':
+                    startDate.setHours(now.getHours() - 1);
+                    break;
+                case '1d':
+                    startDate.setDate(now.getDate() - 1);
+                    break;
+                case '1w':
+                    startDate.setDate(now.getDate() - 7);
+                    break;
+                case '1m':
+                    startDate.setMonth(now.getMonth() - 1);
+                    break;
+            }
+            
+            // Format to datetime-local input format
+            const formatDateTime = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+            
+            document.getElementById('filterStartDate').value = formatDateTime(startDate);
+            document.getElementById('filterEndDate').value = formatDateTime(now);
+        }
+        
         function clearFilters() {
+            document.getElementById('filterStartDate').value = '';
+            document.getElementById('filterEndDate').value = '';
+            document.getElementById('quickDateFilter').value = '';
             document.getElementById('filterRoomId').value = '';
             document.getElementById('filterSender').value = '';
+            document.getElementById('filterReceiver').value = '';
             document.getElementById('searchQuery').value = '';
             
             messagePage = 1;
