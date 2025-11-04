@@ -3,7 +3,8 @@
 
 [build]
   # Python dependencies'i skip etmek için build command'ı değiştirdik
-  command = "cd www/element-web && yarn install && yarn build"
+  # requirements.txt'i geçici olarak yeniden adlandırarak Netlify'nin algılamasını engelliyoruz
+  command = "mv requirements.txt requirements.txt.bak 2>/dev/null || true; cd www/element-web && yarn install && yarn build"
   publish = "www/element-web/webapp"
   
   [build.environment]
@@ -12,6 +13,8 @@
     # Python dependencies'i skip et - Element Web için gerekmiyor
     PIP_REQUIREMENTS_FILE = ""
     PYTHON_VERSION = ""
+    # Python'u tamamen devre dışı bırak
+    NETLIFY_USE_PYTHON = "false"
 
 # Production redirects
 [[redirects]]
