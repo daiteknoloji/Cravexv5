@@ -1388,11 +1388,14 @@ def add_room_member(room_id):
         cur.close()
         conn.close()
         
+        # Get Synapse URL (for both auto-login and API calls)
+        import requests
+        synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+        
         # If no token, try auto-login
         if not admin_token:
             admin_username = os.getenv('ADMIN_USERNAME', 'admin')
             admin_password = os.getenv('ADMIN_PASSWORD')
-            synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
             
             if admin_password:
                 print(f"[INFO] No admin token, attempting auto-login...")
@@ -1996,10 +1999,11 @@ def create_room():
         cur.close()
         conn.close()
         
-        # If no token, try auto-login
+        # Get Synapse URL (for both auto-login and API calls)
         import requests
         synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
         
+        # If no token, try auto-login
         if not admin_token:
             admin_username = os.getenv('ADMIN_USERNAME', 'admin')
             admin_password = os.getenv('ADMIN_PASSWORD')
