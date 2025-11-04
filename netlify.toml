@@ -8,6 +8,9 @@
   [build.environment]
     NODE_VERSION = "22"
     GIT_SUBMODULE_STRATEGY = "none"
+    # Python bağımlılıklarını yükleme (Admin Panel için, Element Web için gerekli değil)
+    PIP_REQUIRE_VIRTUALENV = "false"
+    SKIP_PYTHON_DEPENDENCIES = "true"
 
 # Production redirects
 [[redirects]]

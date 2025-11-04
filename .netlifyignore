@@ -1,3 +1,44 @@
 ﻿# Netlify ignore file
-# Element Web build'i icin Python requirements.txt'yi ignore et
+# Python bağımlılıkları Admin Panel için, Element Web için gerekli değil
+
 requirements.txt
+*.py
+admin-panel-server.py
+make-admin-direct.py
+make-user-admin-simple.py
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Admin Panel dosyaları (Element Web build'i için gerekli değil)
+www/admin/
+
+# Synapse config dosyaları (Element Web build'i için gerekli değil)
+synapse-config/
+synapse-railway-config/
+
+# Railway config dosyaları
+railway*.json
+railway*.toml
+nixpacks.toml
+Procfile.synapse
+
+# Docker dosyaları
+Dockerfile
+Dockerfile.synapse
+docker-compose.yml
+
+# Script dosyaları
+*.ps1
+*.bat
+*.sh
+
+# Documentation dosyaları
+*.md
+!www/element-web/*.md
+!www/element-web/docs/**/*.md
+
+# SQL dosyaları
+*.sql
