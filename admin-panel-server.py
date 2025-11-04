@@ -1778,6 +1778,8 @@ def create_user():
             token_row = cur.fetchone()
             admin_token = token_row[0] if token_row else None
             
+            print(f"[DEBUG] Token query for {ADMIN_USER_ID}: token_row={token_row}, admin_token={'FOUND' if admin_token else 'NONE'}")
+            
             cur.close()
             conn.close()
             
