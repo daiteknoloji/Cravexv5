@@ -1268,10 +1268,22 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label class="form-label">Kullanıcı Seç</label>
-                    <select class="form-select" id="userSelect">
-                        <option value="">Kullanıcı seçin...</option>
-                    </select>
+                    <label class="form-label">Kullanıcı Ara ve Seç</label>
+                    <div style="position: relative;">
+                        <input type="text" class="form-input" id="userSearchInput" 
+                               placeholder="Kullanıcı adı yazın..." 
+                               autocomplete="off"
+                               oninput="filterUserSelect()">
+                        <select class="form-select" id="userSelect" 
+                                style="margin-top: 8px; max-height: 200px; overflow-y: auto;"
+                                size="8"
+                                onchange="selectUserFromList()">
+                            <option value="" disabled>Yukarıda arama yapın...</option>
+                        </select>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                        <i class="fas fa-info-circle"></i> Yukarıdaki kutuya kullanıcı adı yazarak arama yapabilirsiniz
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1839,9 +1851,12 @@
         }
         
         // Add Member
+        let filteredUsersList = [];
+        
         async function openAddMemberModal() {
             const modal = document.getElementById('addMemberModal');
             const select = document.getElementById('userSelect');
+            const searchInput = document.getElementById('userSearchInput');
             
             // Load users if not loaded
             if (allUsers.length === 0) {
@@ -1850,18 +1865,69 @@
                 allUsers = data.users;
             }
             
-            // Populate select
-            let options = '<option value="">Kullanıcı seçin...</option>';
-            allUsers.forEach(user => {
-                options += `<option value="${user.user_id}">${user.displayname || user.user_id}</option>`;
+            // Reset search
+            searchInput.value = '';
+            filteredUsersList = [...allUsers];
+            
+            // Populate select with all users initially
+            updateUserSelectOptions();
+            
+            modal.classList.add('show');
+            searchInput.focus();
+        }
+        
+        function filterUserSelect() {
+            const searchTerm = document.getElementById('userSearchInput').value.toLowerCase();
+            
+            if (!searchTerm) {
+                filteredUsersList = [...allUsers];
+            } else {
+                filteredUsersList = allUsers.filter(user => 
+                    user.user_id.toLowerCase().includes(searchTerm) ||
+                    (user.displayname && user.displayname.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            updateUserSelectOptions();
+        }
+        
+        function updateUserSelectOptions() {
+            const select = document.getElementById('userSelect');
+            
+            if (filteredUsersList.length === 0) {
+                select.innerHTML = '<option value="" disabled>Kullanıcı bulunamadı</option>';
+                return;
+            }
+            
+            let options = '';
+            filteredUsersList.forEach(user => {
+                const displayText = user.displayname ? `${user.displayname} (${user.user_id})` : user.user_id;
+                options += `<option value="${user.user_id}">${displayText}</option>`;
             });
             select.innerHTML = options;
             
-            modal.classList.add('show');
+            // Auto-select first option if only one result
+            if (filteredUsersList.length === 1) {
+                select.selectedIndex = 0;
+            }
+        }
+        
+        function selectUserFromList() {
+            const select = document.getElementById('userSelect');
+            const searchInput = document.getElementById('userSearchInput');
+            
+            if (select.value) {
+                const selectedUser = filteredUsersList.find(u => u.user_id === select.value);
+                if (selectedUser) {
+                    searchInput.value = selectedUser.displayname || selectedUser.user_id;
+                }
+            }
         }
         
         function closeAddMemberModal() {
             document.getElementById('addMemberModal').classList.remove('show');
+            document.getElementById('userSearchInput').value = '';
+            document.getElementById('userSelect').value = '';
         }
         
         async function confirmAddMember() {
