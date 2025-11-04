@@ -1,0 +1,29 @@
+﻿/* =============================================
+   LOGIN PAGE LOGO - CRAVEX CUSTOM
+   ============================================= */
+
+/* Login sayfasi ana logo */
+.mx_AuthHeader_logo,
+.mx_Welcome_logo {
+    background-image: url('/1.svg') !important;
+    background-size: contain !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    width: 180px !important;
+    height: 180px !important;
+    margin: 0 auto 24px !important;
+}
+
+/* Login header - logo ve baslik */
+.mx_AuthPage_header {
+    text-align: center !important;
+    padding: 32px 0 !important;
+}
+
+/* Login form basligi */
+.mx_AuthPage_header h1 {
+    font-size: 28px !important;
+    font-weight: 600 !important;
+    color: #0DBD8B !important;
+    margin-top: 16px !important;
+}
