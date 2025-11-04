@@ -34,6 +34,7 @@ export default class AudioFeed extends React.Component<IProps, IState> {
     public componentDidMount(): void {
         MediaDeviceHandler.instance.addListener(MediaDeviceHandlerEvent.AudioOutputChanged, this.onAudioOutputChanged);
         this.props.feed.addListener(CallFeedEvent.NewStream, this.onNewStream);
+        this.props.feed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
         this.playMedia();
     }
 
@@ -43,7 +44,38 @@ export default class AudioFeed extends React.Component<IProps, IState> {
             this.onAudioOutputChanged,
         );
         this.props.feed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
+        this.props.feed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
         this.stopMedia();
+    }
+
+    public componentDidUpdate(prevProps: IProps, prevState: IState): void {
+        if (prevProps.feed !== this.props.feed) {
+            prevProps.feed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
+            prevProps.feed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+
+            this.props.feed.addListener(CallFeedEvent.NewStream, this.onNewStream);
+            this.props.feed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+
+            const audioMuted = this.props.feed.isAudioMuted();
+            if (audioMuted !== this.state.audioMuted) {
+                this.setState({ audioMuted });
+                return;
+            }
+
+            if (audioMuted) this.stopMedia();
+            else this.playMedia();
+            return;
+        }
+
+        if (prevState.audioMuted !== this.state.audioMuted) {
+            if (this.state.audioMuted) this.stopMedia();
+            else this.playMedia();
+            return;
+        }
+
+        if (!this.state.audioMuted && prevProps.feed.stream !== this.props.feed.stream) {
+            this.playMedia();
+        }
     }
 
     private onAudioOutputChanged = (audioOutput: string): void => {
@@ -67,7 +99,7 @@ export default class AudioFeed extends React.Component<IProps, IState> {
         if (!element) return;
         this.onAudioOutputChanged(MediaDeviceHandler.getAudioOutput());
         element.muted = false;
-        element.srcObject = this.props.feed.stream;
+        element.srcObject = this.props.feed.stream ?? null;
         element.autoplay = true;
 
         try {
@@ -80,7 +112,7 @@ export default class AudioFeed extends React.Component<IProps, IState> {
             // should serialise the ones that need to be serialised but then be able to interrupt
             // them with another load() which will cancel the pending one, but since we don't call
             // load() explicitly, it shouldn't be a problem. - Dave
-            await element.load();
+            await element.play();
         } catch (e) {
             logger.info(
                 `Failed to play media element with feed for userId ` +
@@ -95,6 +127,7 @@ export default class AudioFeed extends React.Component<IProps, IState> {
         if (!element) return;
 
         element.pause();
+        element.srcObject = null;
         element.removeAttribute("src");
 
         // As per comment in componentDidMount, setting the sink ID back to the
@@ -104,10 +137,24 @@ export default class AudioFeed extends React.Component<IProps, IState> {
     }
 
     private onNewStream = (): void => {
-        this.setState({
-            audioMuted: this.props.feed.isAudioMuted(),
-        });
-        this.playMedia();
+        const audioMuted = this.props.feed.isAudioMuted();
+        if (audioMuted !== this.state.audioMuted) {
+            this.setState({ audioMuted });
+            return;
+        }
+
+        if (!audioMuted) this.playMedia();
+    };
+
+    private onMuteStateChanged = (): void => {
+        const audioMuted = this.props.feed.isAudioMuted();
+        if (audioMuted === this.state.audioMuted) {
+            if (audioMuted) this.stopMedia();
+            else this.playMedia();
+            return;
+        }
+
+        this.setState({ audioMuted });
     };
 
     public render(): React.ReactNode {
