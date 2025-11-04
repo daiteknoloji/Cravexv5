@@ -32,13 +32,6 @@
         "turn_servers": [
             {
                 "urls": [
-                    "turn:turn-server-production-2809.up.railway.app:3478?transport=tcp"
-                ],
-                "username": "webrtc",
-                "credential": "secret"
-            },
-            {
-                "urls": [
                     "turn:relay.metered.ca:80",
                     "turn:relay.metered.ca:443",
                     "turn:relay.metered.ca:80?transport=tcp",
@@ -56,6 +49,13 @@
                 ],
                 "username": "openrelayproject",
                 "credential": "openrelayproject"
+            },
+            {
+                "urls": [
+                    "turn:turn-server-production-2809.up.railway.app:3478?transport=tcp"
+                ],
+                "username": "webrtc",
+                "credential": "secret"
             },
             {
                 "urls": [

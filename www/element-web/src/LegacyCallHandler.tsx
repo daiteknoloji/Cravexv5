@@ -436,6 +436,15 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
             if (!this.matchesCallForThisRoom(call)) return;
 
             logger.error("Call error:", err);
+            logger.error("Call error code:", err.code);
+            logger.error("Call error message:", err.message);
+            
+            // Debug: Log ICE connection state if available
+            if (call.peerConn) {
+                logger.error("ICE Connection State:", call.peerConn.iceConnectionState);
+                logger.error("ICE Gathering State:", call.peerConn.iceGatheringState);
+                logger.error("Signaling State:", call.peerConn.signalingState);
+            }
 
             if (err.code === CallErrorCode.NoUserMedia) {
                 this.showMediaCaptureError(call);
@@ -763,6 +772,18 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
 
         const timeUntilTurnCresExpire = cli.getTurnServersExpiry() - Date.now();
         logger.log("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
+        
+        // Debug: Log TURN server information
+        const turnServers = cli.getTurnServers();
+        logger.log("Available TURN servers:", turnServers.length);
+        turnServers.forEach((server, index) => {
+            logger.log(`TURN Server ${index + 1}:`, {
+                uris: server.uris,
+                username: server.username,
+                credential: server.credential ? "***" : "missing",
+            });
+        });
+        
         const call = cli.createCall(roomId)!;
 
         try {
