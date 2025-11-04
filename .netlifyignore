@@ -1,0 +1,3 @@
+﻿# Netlify ignore file
+# Element Web build'i icin Python requirements.txt'yi ignore et
+requirements.txt
