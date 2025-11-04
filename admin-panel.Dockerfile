@@ -21,6 +21,7 @@ COPY admin-panel-server.py .
 COPY admin-panel-ui-modern.html .
 COPY 1.svg .
 RUN echo "Build timestamp: $(date)" > /app/build.txt
+RUN find /app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Expose port (Railway uses PORT env var)
 EXPOSE 8080
