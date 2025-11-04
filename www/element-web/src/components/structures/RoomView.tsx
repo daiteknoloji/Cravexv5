@@ -1400,7 +1400,18 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         const crypto = this.context.client?.getCrypto();
         if (!crypto || !roomId) return false;
 
-        return await crypto.isEncryptionEnabledInRoom(roomId);
+        // Ensure roomId has correct format (starts with !)
+        if (!roomId.startsWith('!')) {
+            logger.warn(`Room ID missing sigil: ${roomId}`);
+            return false;
+        }
+
+        try {
+            return await crypto.isEncryptionEnabledInRoom(roomId);
+        } catch (err) {
+            logger.error(`Failed to check encryption status for room ${roomId}:`, err);
+            return false;
+        }
     }
 
     private async calculateRecommendedVersion(room: Room): Promise<void> {
