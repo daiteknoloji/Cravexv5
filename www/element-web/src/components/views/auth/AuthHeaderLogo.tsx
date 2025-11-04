@@ -16,8 +16,8 @@ export default class AuthHeaderLogo extends React.PureComponent {
         const logoUrl = brandingConfig?.get("auth_header_logo_url") ?? "themes/element/img/logos/element-logo.svg";
 
         return (
-            <aside className="mx_AuthHeaderLogo" style={{ display: "none" }}>
-                <img src={logoUrl} alt="Chat" />
+            <aside className="mx_AuthHeaderLogo">
+                <img src={logoUrl} alt="Element" />
             </aside>
         );
     }

@@ -3,43 +3,36 @@
  * voodoo where we have to set display: none by default
  */
 
-    @keyframes subtle-float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-20px); }
-    }
-
-    @keyframes subtle-gradient {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-    }
-
     .mx_Header_title::after {
         content: "!";
     }
 
     .mx_Parent {
+        display: -webkit-box;
+        display: -webkit-flex;
+        display: -ms-flexbox;
         display: flex;
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+        -webkit-flex-direction: column;
+        -ms-flex-direction: column;
         flex-direction: column;
+        -webkit-box-pack: center;
+        -webkit-justify-content: center;
+        -ms-flex-pack: center;
         justify-content: center;
+        -webkit-box-align: center;
+        -webkit-align-items: center;
+        -ms-flex-align: center;
         align-items: center;
         text-align: center;
-        padding: 43px 120px;
+        padding: 25px 35px;
         color: #2e2f32;
-        min-width: 600px;
-        max-width: 90vw;
-        min-height: 429px;
-        width: auto;
-        box-sizing: border-box;
-        animation: subtle-float 8s ease-in-out infinite;
     }
 
     .mx_Logo {
-        height: 2722px;
-        max-height: 45vh;
-        width: auto;
-        margin-top: 10px;
-        margin-bottom: 30px;
-        object-fit: contain;
+        height: 54px;
+        margin-top: 2px;
     }
 
     .mx_ButtonGroup {
@@ -79,7 +72,7 @@
         display: -webkit-flex;
         display: -ms-flexbox;
         display: flex;
-        padding: 16px 32px;
+        padding: 10px 20px;
         -webkit-box-orient: horizontal;
         -webkit-box-direction: normal;
         -webkit-flex-direction: row;
@@ -93,42 +86,28 @@
         -webkit-align-items: center;
         -ms-flex-align: center;
         align-items: center;
-        border-radius: 8px;
-        min-width: 200px;
+        border-radius: 4px;
+        width: 150px;
         background-repeat: no-repeat;
-        background-position: 16px center;
-        background-size: 24px;
+        background-position: 10px center;
         text-decoration: none;
         color: #2e2f32 !important;
-        font-size: 16px;
-        font-weight: 600;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-
-    .mx_ButtonParent:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 
     .mx_ButtonLabel {
-        margin-left: 32px;
+        margin-left: 20px;
     }
 
     .mx_Header_title {
-        font-size: 42px;
-        font-weight: 700;
-        margin: 30px 0 0;
-        line-height: 1.3;
-        letter-spacing: -0.5px;
+        font-size: 24px;
+        font-weight: 600;
+        margin: 20px 0 0;
     }
 
     .mx_Header_subtitle {
-        font-size: 18px;
-        font-weight: 400;
-        margin: 16px 0 0;
-        line-height: 1.6;
-        max-width: 600px;
+        font-size: 12px;
+        font-weight: normal;
+        margin: 8px 0 0;
     }
 
     .mx_ButtonSignIn {
@@ -175,63 +154,21 @@ we don't have an account and should hide them. No account == no guest account ei
         margin: 0 auto;
     }
 
-    @media only screen and (max-width: 768px) {
-        .mx_Parent {
-            padding: 40px 30px;
-            min-width: 300px;
-            min-height: 500px;
-        }
-
-        .mx_Logo {
-            max-height: 40vh;
-        }
-
-        .mx_Header_title {
-            font-size: 32px;
-        }
-
-        .mx_Header_subtitle {
-            font-size: 16px;
-        }
-
+    @media only screen and (max-width: 480px) {
         .mx_ButtonRow {
             flex-direction: column;
-            width: 100%;
         }
 
         .mx_ButtonRow > * {
-            margin: 0 0 12px 0;
-            width: 100%;
-        }
-
-        .mx_ButtonParent {
-            width: 100%;
-            min-width: auto;
-        }
-    }
-
-    @media only screen and (max-width: 480px) {
-        .mx_Parent {
-            padding: 30px 20px;
-            min-width: 280px;
-        }
-
-        .mx_Logo {
-            max-height: 35vh;
-        }
-
-        .mx_Header_title {
-            font-size: 28px;
-        }
-
-        .mx_Header_subtitle {
-            font-size: 14px;
+            margin: 0 0 10px 0;
         }
     }
 </style>
 
 <div class="mx_Parent">
-    <img src="$logoUrl" alt="CraveX" class="mx_Logo" />
+    <a href="https://element.io" target="_blank" rel="noopener">
+        <img src="$logoUrl" alt="" class="mx_Logo" />
+    </a>
     <h1 class="mx_Header_title">_t("welcome_to_element")</h1>
     <!-- XXX: Our translations system isn't smart enough to recognize variables in the HTML, so we manually do it -->
     <h4 class="mx_Header_subtitle">_t("powered_by_matrix_with_logo")</h4>

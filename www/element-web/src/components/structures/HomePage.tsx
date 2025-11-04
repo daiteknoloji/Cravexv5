@@ -104,7 +104,7 @@ const HomePage: React.FC<IProps> = ({ justRegistered = false }) => {
 
         introSection = (
             <React.Fragment>
-                <img src={logoUrl} alt={config.brand} style={{ display: "none" }} />
+                <img src={logoUrl} alt={config.brand} />
                 <h1>{_tDom("onboarding|intro_welcome", { appName: config.brand })}</h1>
                 <h2>{_tDom("onboarding|intro_byline")}</h2>
             </React.Fragment>

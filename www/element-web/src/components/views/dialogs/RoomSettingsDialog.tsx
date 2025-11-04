@@ -208,23 +208,6 @@ class RoomSettingsDialog extends React.Component<IProps, IState> {
             ),
         );
 
-        if (SettingsStore.getValue(UIFeature.AdvancedSettings)) {
-            tabs.push(
-                new Tab(
-                    RoomSettingsTab.Advanced,
-                    _td("common|advanced"),
-                    "mx_RoomSettingsDialog_warningIcon",
-                    (
-                        <AdvancedRoomSettingsTab
-                            room={this.state.room}
-                            closeSettingsFn={() => this.props.onFinished(true)}
-                        />
-                    ),
-                    "RoomSettingsAdvanced",
-                ),
-            );
-        }
-
         return tabs as NonEmptyArray<Tab<RoomSettingsTab>>;
     }
 

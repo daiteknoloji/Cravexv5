@@ -17,33 +17,24 @@ import {
     EventType,
 } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
-import { InlineSpinner } from "@vector-im/compound-web";
-
 import { Icon as WarningIcon } from "../../../../../../res/img/warning.svg";
 import { _t } from "../../../../../languageHandler";
 import LabelledToggleSwitch from "../../../elements/LabelledToggleSwitch";
 import Modal from "../../../../../Modal";
 import QuestionDialog from "../../../dialogs/QuestionDialog";
 import StyledRadioGroup from "../../../elements/StyledRadioGroup";
-import { SettingLevel } from "../../../../../settings/SettingLevel";
 import SettingsStore from "../../../../../settings/SettingsStore";
 import { UIFeature } from "../../../../../settings/UIFeature";
 import AccessibleButton from "../../../elements/AccessibleButton";
-import SettingsFlag from "../../../elements/SettingsFlag";
 import createRoom from "../../../../../createRoom";
 import CreateRoomDialog from "../../../dialogs/CreateRoomDialog";
 import JoinRuleSettings from "../../JoinRuleSettings";
 import ErrorDialog from "../../../dialogs/ErrorDialog";
 import SettingsFieldset from "../../SettingsFieldset";
-import ExternalLink from "../../../elements/ExternalLink";
 import PosthogTrackers from "../../../../../PosthogTrackers";
 import MatrixClientContext from "../../../../../contexts/MatrixClientContext";
 import { SettingsSection } from "../../shared/SettingsSection";
 import SettingsTab from "../SettingsTab";
-import SdkConfig from "../../../../../SdkConfig";
-import { shouldForceDisableEncryption } from "../../../../../utils/crypto/shouldForceDisableEncryption";
-import { Caption } from "../../../typography/Caption";
-import { MEGOLM_ENCRYPTION_ALGORITHM } from "../../../../../utils/crypto";
 
 interface IProps {
     room: Room;
@@ -111,79 +102,6 @@ export default class SecurityRoomSettingsTab extends React.Component<IProps, ISt
         if (refreshWhenTypes.includes(e.getType() as EventType)) this.forceUpdate();
     };
 
-    private onEncryptionChange = async (): Promise<void> => {
-        if (this.props.room.getJoinRule() === JoinRule.Public) {
-            const dialog = Modal.createDialog(QuestionDialog, {
-                title: _t("room_settings|security|enable_encryption_public_room_confirm_title"),
-                description: (
-                    <div>
-                        <p>
-                            {" "}
-                            {_t(
-                                "room_settings|security|enable_encryption_public_room_confirm_description_1",
-                                undefined,
-                                { b: (sub) => <strong>{sub}</strong> },
-                            )}{" "}
-                        </p>
-                        <p>
-                            {" "}
-                            {_t(
-                                "room_settings|security|enable_encryption_public_room_confirm_description_2",
-                                undefined,
-                                {
-                                    a: (sub) => (
-                                        <AccessibleButton
-                                            kind="link_inline"
-                                            onClick={() => {
-                                                dialog.close();
-                                                this.createNewRoom(false, true);
-                                            }}
-                                        >
-                                            {" "}
-                                            {sub}{" "}
-                                        </AccessibleButton>
-                                    ),
-                                },
-                            )}{" "}
-                        </p>
-                    </div>
-                ),
-            });
-
-            const { finished } = dialog;
-            const [confirm] = await finished;
-            if (!confirm) return;
-        }
-
-        const { finished } = Modal.createDialog(QuestionDialog, {
-            title: _t("room_settings|security|enable_encryption_confirm_title"),
-            description: _t(
-                "room_settings|security|enable_encryption_confirm_description",
-                {},
-                {
-                    a: (sub) => <ExternalLink href={SdkConfig.get("help_encryption_url")}>{sub}</ExternalLink>,
-                },
-            ),
-        });
-        finished.then(([confirm]) => {
-            if (!confirm) {
-                this.setState({ encrypted: false });
-                return;
-            }
-
-            const beforeEncrypted = this.state.encrypted;
-            this.setState({ encrypted: true });
-            this.context
-                .sendStateEvent(this.props.room.roomId, EventType.RoomEncryption, {
-                    algorithm: MEGOLM_ENCRYPTION_ALGORITHM,
-                })
-                .catch((e) => {
-                    logger.error(e);
-                    this.setState({ encrypted: beforeEncrypted });
-                });
-        });
-    };
-
     private onGuestAccessChange = (allowed: boolean): void => {
         const guestAccess = allowed ? GuestAccess.CanJoin : GuestAccess.Forbidden;
         const beforeGuestAccess = this.state.guestAccess;
@@ -236,10 +154,6 @@ export default class SecurityRoomSettingsTab extends React.Component<IProps, ISt
                 logger.error(e);
                 this.setState({ history: beforeHistory });
             });
-    };
-
-    private updateBlacklistDevicesFlag = (checked: boolean): void => {
-        this.props.room.setBlacklistUnverifiedDevices(checked);
     };
 
     private async hasAliases(): Promise<boolean> {
@@ -417,59 +331,11 @@ export default class SecurityRoomSettingsTab extends React.Component<IProps, ISt
     }
 
     public render(): React.ReactNode {
-        const client = this.context;
-        const room = this.props.room;
-        const isEncrypted = this.state.encrypted;
-        const isEncryptionLoading = isEncrypted === null;
-        const hasEncryptionPermission = room.currentState.mayClientSendStateEvent(EventType.RoomEncryption, client);
-        const isEncryptionForceDisabled = shouldForceDisableEncryption(client);
-        const canEnableEncryption = !isEncrypted && !isEncryptionForceDisabled && hasEncryptionPermission;
-
-        let encryptionSettings: JSX.Element | undefined;
-        if (
-            isEncrypted &&
-            SettingsStore.canSetValue("blacklistUnverifiedDevices", this.props.room.roomId, SettingLevel.ROOM_DEVICE)
-        ) {
-            encryptionSettings = (
-                <SettingsFlag
-                    name="blacklistUnverifiedDevices"
-                    level={SettingLevel.ROOM_DEVICE}
-                    onChange={this.updateBlacklistDevicesFlag}
-                    roomId={this.props.room.roomId}
-                />
-            );
-        }
-
         const historySection = this.renderHistory();
 
         return (
             <SettingsTab>
                 <SettingsSection heading={_t("room_settings|security|title")}>
-                    <SettingsFieldset
-                        legend={_t("settings|security|encryption_section")}
-                        description={
-                            isEncryptionForceDisabled && !isEncrypted
-                                ? undefined
-                                : _t("room_settings|security|encryption_permanent")
-                        }
-                    >
-                        {isEncryptionLoading ? (
-                            <InlineSpinner />
-                        ) : (
-                            <>
-                                <LabelledToggleSwitch
-                                    value={isEncrypted}
-                                    onChange={this.onEncryptionChange}
-                                    label={_t("common|encrypted")}
-                                    disabled={!canEnableEncryption}
-                                />
-                                {isEncryptionForceDisabled && !isEncrypted && (
-                                    <Caption>{_t("room_settings|security|encryption_forced")}</Caption>
-                                )}
-                                {encryptionSettings}
-                            </>
-                        )}
-                    </SettingsFieldset>
                     {this.renderJoinRule()}
                     {historySection}
                 </SettingsSection>

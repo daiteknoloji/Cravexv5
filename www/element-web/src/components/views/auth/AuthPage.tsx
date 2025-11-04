@@ -36,10 +36,8 @@ export default class AuthPage extends React.PureComponent<React.PropsWithChildre
     }
 
     public render(): React.ReactElement {
-        const pageStyle: React.CSSProperties = {
-            background: "linear-gradient(-45deg, #ffffff, #f8f9fa, #e9ecef, #f8f9fa)",
-            backgroundSize: "400% 400%",
-            animation: "subtle-gradient 15s ease infinite",
+        const pageStyle = {
+            background: `center/cover fixed url(${AuthPage.getWelcomeBackgroundUrl()})`,
         };
 
         const modalStyle: React.CSSProperties = {
@@ -54,31 +52,25 @@ export default class AuthPage extends React.PureComponent<React.PropsWithChildre
             bottom: 0,
             left: 0,
             filter: "blur(40px)",
-            background: "rgba(255, 255, 255, 0.3)",
+            background: pageStyle.background,
         };
 
         const modalContentStyle: React.CSSProperties = {
             display: "flex",
             zIndex: 1,
-            background: "rgba(255, 255, 255, 0.98)",
-            borderRadius: "16px",
-            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+            background: "rgba(255, 255, 255, 0.59)",
+            borderRadius: "8px",
         };
 
         return (
             <div className="mx_AuthPage" style={pageStyle}>
-                <style>{`
-                    @keyframes subtle-gradient {
-                        0%, 100% { background-position: 0% 50%; }
-                        50% { background-position: 100% 50%; }
-                    }
-                `}</style>
                 <div className="mx_AuthPage_modal" style={modalStyle}>
                     <div className="mx_AuthPage_modalBlur" style={blurStyle} />
                     <div className="mx_AuthPage_modalContent" style={modalContentStyle}>
                         {this.props.children}
                     </div>
                 </div>
+                <AuthFooter />
             </div>
         );
     }

@@ -6,8 +6,9 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import React, { useContext } from "react";
-import { type Thread, ThreadEvent, type MatrixEvent } from "matrix-js-sdk/src/matrix";
+import React, { useContext, useMemo } from "react";
+import type { HTMLAttributes, JSX } from "react";
+import { type Thread, ThreadEvent, type MatrixEvent, THREAD_RELATION_TYPE } from "matrix-js-sdk/src/matrix";
 import { IndicatorIcon } from "@vector-im/compound-web";
 import ThreadIconSolid from "@vector-im/compound-design-tokens/assets/web/icons/threads-solid";
 
@@ -25,45 +26,90 @@ import { notificationLevelToIndicator } from "../../../utils/notifications";
 import { EventPreviewTile, useEventPreview } from "./EventPreview.tsx";
 import { useScopedRoomContext } from "../../../contexts/ScopedRoomContext.tsx";
 
-interface IProps {
+interface IProps extends HTMLAttributes<HTMLDivElement> {
     mxEvent: MatrixEvent;
     thread: Thread;
 }
 
 const ThreadSummary: React.FC<IProps> = ({ mxEvent, thread, ...props }) => {
-    const roomContext = useScopedRoomContext("narrow");
     const cardContext = useContext(CardContext);
-    const count = useTypedEventEmitterState(thread, ThreadEvent.Update, () => thread.length);
+    const roomContext = useScopedRoomContext("narrow");
+    const totalCount = useTypedEventEmitterState(thread, ThreadEvent.Update, () => thread.length) ?? 0;
+    const events = useTypedEventEmitterState(thread, ThreadEvent.Update, () => thread.events?.slice() ?? []);
+    const replies = useMemo(
+        () => {
+            const unique = new Map<string, MatrixEvent>();
+            for (const event of events) {
+                const key = event.getId() ?? event.getTxnId() ?? `pending-${event.getTs()}`;
+                unique.set(key, event);
+            }
+
+            return Array.from(unique.values())
+                .filter(
+                    (event) =>
+                        event.getId() !== mxEvent.getId() &&
+                        THREAD_RELATION_TYPE.names.some((name) => event.isRelation(name)),
+                )
+                .slice(-5);
+        },
+        [events, mxEvent],
+    );
     const { level } = useUnreadNotifications(thread.room, thread.id);
 
-    if (!count) return null; // We don't want to show a thread summary if the thread doesn't have replies yet
+    const onOpenThread = (ev: ButtonEvent): void => {
+        defaultDispatcher.dispatch<ShowThreadPayload>({
+            action: Action.ShowThread,
+            rootEvent: mxEvent,
+            push: cardContext.isCard,
+        });
+        PosthogTrackers.trackInteraction("WebRoomTimelineThreadSummaryButton", ev);
+    };
 
-    let countSection: string | number = count;
-    if (!roomContext.narrow) {
-        countSection = _t("threads|count_of_reply", { count });
+    if (roomContext.narrow) {
+        if (!totalCount) return null;
+        return (
+            <AccessibleButton
+                {...props}
+                className="mx_ThreadSummary"
+                onClick={onOpenThread}
+                aria-label={_t("custom_thread|open_panel")}
+            >
+                <IndicatorIcon size="24px" indicator={notificationLevelToIndicator(level)}>
+                    <ThreadIconSolid />
+                </IndicatorIcon>
+                <span className="mx_ThreadSummary_replies_amount">{totalCount}</span>
+                <ThreadMessagePreview thread={thread} showDisplayname={false} />
+                <div className="mx_ThreadSummary_chevron" />
+            </AccessibleButton>
+        );
     }
 
+    if (!replies.length) return null;
+
     return (
-        <AccessibleButton
-            {...props}
-            className="mx_ThreadSummary"
-            onClick={(ev: ButtonEvent) => {
-                defaultDispatcher.dispatch<ShowThreadPayload>({
-                    action: Action.ShowThread,
-                    rootEvent: mxEvent,
-                    push: cardContext.isCard,
-                });
-                PosthogTrackers.trackInteraction("WebRoomTimelineThreadSummaryButton", ev);
-            }}
-            aria-label={_t("threads|open_thread")}
-        >
-            <IndicatorIcon size="24px" indicator={notificationLevelToIndicator(level)}>
-                <ThreadIconSolid />
-            </IndicatorIcon>
-            <span className="mx_ThreadSummary_replies_amount">{countSection}</span>
-            <ThreadMessagePreview thread={thread} showDisplayname={!roomContext.narrow} />
-            <div className="mx_ThreadSummary_chevron" />
-        </AccessibleButton>
+        <div {...props} className="mx_ThreadSummaryInline">
+            <div className="mx_ThreadSummaryInline_header">
+                <IndicatorIcon size="24px" indicator={notificationLevelToIndicator(level)}>
+                    <ThreadIconSolid />
+                </IndicatorIcon>
+                <span className="mx_ThreadSummaryInline_label">
+                    {_t("custom_thread|header", { count: replies.length })}
+                </span>
+                <AccessibleButton className="mx_ThreadSummaryInline_openButton" onClick={onOpenThread}>
+                    {_t("custom_thread|open_panel")}
+                </AccessibleButton>
+            </div>
+            <ol className="mx_ThreadSummaryInline_list">
+                {replies.map((reply) => (
+                    <li
+                        key={reply.getId() ?? reply.getTxnId() ?? `pending-${reply.getTs()}`}
+                        className="mx_ThreadSummaryInline_item"
+                    >
+                        <ThreadReplyItem mxEvent={reply} showDisplayname={!roomContext.narrow} />
+                    </li>
+                ))}
+            </ol>
+        </div>
     );
 };
 
@@ -103,6 +149,44 @@ export const ThreadMessagePreview: React.FC<IPreviewProps> = ({ thread, showDisp
                 <EventPreviewTile preview={preview} className="mx_ThreadSummary_content" />
             )}
         </>
+    );
+};
+
+interface ThreadReplyItemProps {
+    mxEvent: MatrixEvent;
+    showDisplayname: boolean;
+}
+
+const ThreadReplyItem: React.FC<ThreadReplyItemProps> = ({ mxEvent, showDisplayname }): JSX.Element => {
+    const preview = useEventPreview(mxEvent);
+
+    return (
+        <div className="mx_ThreadSummary_reply">
+            <MemberAvatar
+                member={mxEvent.sender}
+                fallbackUserId={mxEvent.getSender()}
+                size="24px"
+                className="mx_ThreadSummary_avatar"
+            />
+            <div className="mx_ThreadSummary_replyBody">
+                {showDisplayname && (
+                    <div className="mx_ThreadSummary_replySender">{mxEvent.sender?.name ?? mxEvent.getSender()}</div>
+                )}
+
+                {mxEvent.isDecryptionFailure() ? (
+                    <div
+                        className="mx_ThreadSummary_replyText mx_DecryptionFailureBody"
+                        title={_t("timeline|decryption_failure|unable_to_decrypt")}
+                    >
+                        {_t("timeline|decryption_failure|unable_to_decrypt")}
+                    </div>
+                ) : preview ? (
+                    <EventPreviewTile preview={preview} className="mx_ThreadSummary_replyText" />
+                ) : (
+                    <span className="mx_ThreadSummary_replyFallback">{_t("custom_thread|reply_fallback")}</span>
+                )}
+            </div>
+        </div>
     );
 };
 

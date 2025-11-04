@@ -128,3 +128,88 @@ Please see LICENSE files in the repository root for full details.
         color: $secondary-content;
     }
 }
+
+.mx_ThreadSummaryInline {
+    margin-top: $spacing-4;
+    background-color: $panels;
+    border: 1px solid $panels;
+    border-radius: 8px;
+    max-width: min(calc(100% - var(--EventTile_group_line-spacing-inline-start)), 600px);
+    width: fit-content;
+    box-sizing: border-box;
+    padding: $spacing-12;
+    color: $secondary-content;
+
+    .mx_MessagePanel_narrow & {
+        max-width: 100%;
+        width: 100%;
+    }
+}
+
+.mx_ThreadSummaryInline_header {
+    display: flex;
+    align-items: center;
+    gap: $spacing-8;
+}
+
+.mx_ThreadSummaryInline_label {
+    flex: 1;
+    font-weight: var(--cpd-font-weight-semibold);
+    color: $primary-content;
+}
+
+.mx_ThreadSummaryInline_openButton {
+    padding: 0;
+    color: $accent;
+    font-weight: var(--cpd-font-weight-medium);
+}
+
+.mx_ThreadSummaryInline_openButton:hover,
+.mx_ThreadSummaryInline_openButton:focus {
+    text-decoration: underline;
+}
+
+.mx_ThreadSummaryInline_list {
+    list-style: none;
+    margin: $spacing-8 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-8;
+}
+
+.mx_ThreadSummaryInline_item {
+    display: flex;
+}
+
+.mx_ThreadSummary_reply {
+    display: flex;
+    gap: $spacing-8;
+    width: 100%;
+}
+
+.mx_ThreadSummary_replyBody {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-4;
+    flex: 1;
+    min-width: 0;
+}
+
+.mx_ThreadSummary_replySender {
+    font-weight: var(--cpd-font-weight-semibold);
+    color: $primary-content;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.mx_ThreadSummary_replyText {
+    color: $secondary-content;
+    word-break: break-word;
+}
+
+.mx_ThreadSummary_replyFallback {
+    color: $secondary-content;
+    font-style: italic;
+}

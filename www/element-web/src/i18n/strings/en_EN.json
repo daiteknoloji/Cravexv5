@@ -663,9 +663,9 @@
         "stop_voice_message": "Stop recording",
         "voice_message_button": "Voice Message"
     },
-    "console_dev_note": "",
-    "console_scam_warning": "",
-    "console_wait": "",
+    "console_dev_note": "If you know what you're doing, Element is open-source, be sure to check out our GitHub (https://github.com/vector-im/element-web/) and contribute!",
+    "console_scam_warning": "If someone told you to copy/paste something here, there is a high likelihood you're being scammed!",
+    "console_wait": "Wait!",
     "create_room": {
         "action_create_room": "Create room",
         "action_create_video_room": "Create video room",
@@ -1716,7 +1716,7 @@
         "explore_rooms": "Explore Public Rooms",
         "has_avatar_label": "Great, that'll help people know it's you",
         "intro_byline": "Own your conversations.",
-        "intro_welcome": "Welcome",
+        "intro_welcome": "Welcome to %(appName)s",
         "no_avatar_label": "Add a photo so people know it's you.",
         "send_dm": "Send a Direct Message",
         "welcome_detail": "Now, let's help you get started",
@@ -4044,7 +4044,7 @@
         "you_are_presenting": "You are presenting"
     },
     "web_default_device_name": "%(appName)s: %(browserName)s on %(osName)s",
-    "welcome_to_element": "Welcome",
+    "welcome_to_element": "Welcome to Element",
     "widget": {
         "added_by": "Widget added by",
         "capabilities_dialog": {
@@ -4199,5 +4199,30 @@
             "userInputs": "There should not be any personal or page related data.",
             "wordByItself": "A word by itself is easy to guess"
         }
+    },
+    "custom_help": {
+        "guide_title": "Quick Start",
+        "guide_intro": "Use this summary to reach the most common tools in the Cravex control panel.",
+        "guide_step_rooms": "Go to Rooms to watch conversations live and manage room members.",
+        "guide_step_messages": "Open the message archive to review, delete, or export transcripts.",
+        "guide_step_files": "Check Shared files for downloads and remove anything that breaks policy.",
+        "guide_step_monitoring": "Track live system status and moderation logs from the Monitoring page.",
+        "shortcuts_title": "Keyboard Shortcuts",
+        "shortcuts_info": "These shortcuts help you move quickly without leaving the keyboard:",
+        "shortcut_navigate": "Ctrl + K: Search rooms or users.",
+        "shortcut_search": "Ctrl + F: Search inside the current conversation.",
+        "shortcut_settings": "Ctrl + , : Open the Settings menu.",
+        "resources_title": "Resources",
+        "resources_description": "Need more detail? Download the guides below when you are logged in.",
+        "resource_manual": "Download the Operator Handbook (PDF)",
+        "resource_faq": "Download the FAQ sheet (PDF)",
+        "support_title": "Support",
+        "support_description": "Write to help@cravex.chat to escalate an issue or report an incident."
+    },
+    "custom_thread": {
+        "header": "Replies (%(count)s)",
+        "open_panel": "Open full thread",
+        "panel_hint": "Replies are loading. Open the side panel to see the full conversation.",
+        "reply_fallback": "This reply cannot be previewed."
     }
 }

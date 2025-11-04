@@ -644,9 +644,9 @@
         "stop_voice_message": "Kaydı durdur",
         "voice_message_button": "Sesli Mesaj"
     },
-    "console_dev_note": "",
-    "console_scam_warning": "",
-    "console_wait": "",
+    "console_dev_note": "Ne yaptığınızı biliyorsanız, Element açık kaynaklıdır, GitHub'ımıza (https://github.com/vector-im/element-web/) göz atmayı ve katkıda bulunmayı unutmayın!",
+    "console_scam_warning": "Birisi size buraya bir şey kopyalayıp yapıştırmanızı söylediyse, dolandırılıyor olma olasılığınız yüksektir!",
+    "console_wait": "Bekle!",
     "create_room": {
         "action_create_room": "Oda oluştur",
         "action_create_video_room": "Video odası oluştur",
@@ -1650,7 +1650,7 @@
         "explore_rooms": "Herkese açık odaları keşfet",
         "has_avatar_label": "Harika, bu insanların sen olduğunu anlamalarına yardımcı olur.",
         "intro_byline": "Konuşmalarınıza sahip çıkın.",
-        "intro_welcome": "Hoş geldiniz",
+        "intro_welcome": "%(appName)s' e Hoş geldiniz",
         "no_avatar_label": "İnsanların kimliğinizi anlaması için bir fotoğraf ekleyin.",
         "send_dm": "Doğrudan Mesaj Gönder",
         "welcome_detail": "Şimdi, başlamanıza yardım edelim",
@@ -3888,7 +3888,7 @@
         "you_are_presenting": "Sunum yapıyorsunuz"
     },
     "web_default_device_name": "%(appName)s: %(browserName)s %(osName)s",
-    "welcome_to_element": "Hoş Geldiniz",
+    "welcome_to_element": "Element'e Hoş Geldiniz",
     "widget": {
         "added_by": "Widget ekleyen",
         "capabilities_dialog": {
@@ -4043,5 +4043,30 @@
             "userInputs": "Hiçbir kişisel veya sayfayla ilgili veri bulunmamalıdır.",
             "wordByItself": "Kelime zaten kolay tahmin edilir"
         }
+    },
+    "custom_help": {
+        "guide_title": "Hızlı Başlangıç",
+        "guide_intro": "Cravex kontrol panelindeki başlıca araçlara bu özetle ulaşabilirsiniz.",
+        "guide_step_rooms": "Sohbetleri canlı izlemek ve üyeleri yönetmek için Odalar bölümüne girin.",
+        "guide_step_messages": "Mesaj arşivini açarak kayıtları inceleyin, silin veya dışa aktarın.",
+        "guide_step_files": "Paylaşılan dosyaları kontrol edin; politika dışı içerikleri kaldırın.",
+        "guide_step_monitoring": "Canlı durum ve moderasyon loglarını İzleme sayfasından takip edin.",
+        "shortcuts_title": "Klavye Kısayolları",
+        "shortcuts_info": "Fareni kullanmadan hızlı hareket etmenizi sağlayan kısayollar:",
+        "shortcut_navigate": "Ctrl + K: Oda veya kullanıcı arayın.",
+        "shortcut_search": "Ctrl + F: Açık odada mesaj arayın.",
+        "shortcut_settings": "Ctrl + , : Ayarlar menüsünü açın.",
+        "resources_title": "Kaynaklar",
+        "resources_description": "Detaylı anlatımlar için giriş yaptıktan sonra aşağıdaki dokümanları indirin.",
+        "resource_manual": "Operatör El Kitabı'nı indir (PDF)",
+        "resource_faq": "SSS dokümanını indir (PDF)",
+        "support_title": "Destek",
+        "support_description": "Yardım gerektiğinde help@cravex.chat adresine e-posta gönderin."
+    },
+    "custom_thread": {
+        "header": "Yanıtlar (%(count)s)",
+        "open_panel": "Tam konuyu panelde aç",
+        "panel_hint": "Yanıtlar henüz yüklenmedi. Tam konu için sağ paneli açın.",
+        "reply_fallback": "Bu yanıt önizlenemiyor."
     }
 }

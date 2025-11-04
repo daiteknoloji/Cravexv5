@@ -17,6 +17,7 @@ Please see LICENSE files in the repository root for full details.
     &:not(.mx_RoomSublist_minimized) {
         .mx_RoomSublist_headerContainer {
             height: auto;
+            margin-bottom: 8px;
         }
     }
 
@@ -138,6 +139,13 @@ Please see LICENSE files in the repository root for full details.
             flex: 1;
             max-width: calc(100% - 16px); /* 16px is the badge width */
             font: var(--cpd-font-body-sm-semibold);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 12px;
+            background: var(--cpd-color-bg-subtle-primary);
+            color: $primary-content;
 
             /* Ellipsize any text overflow */
             text-overflow: ellipsis;
@@ -147,14 +155,13 @@ Please see LICENSE files in the repository root for full details.
             .mx_RoomSublist_collapseBtn {
                 display: inline-block;
                 position: relative;
-                width: 14px;
-                height: 14px;
-                margin-right: 6px;
+                width: 16px;
+                height: 16px;
 
                 &::before {
                     content: "";
-                    width: 18px;
-                    height: 18px;
+                    width: 16px;
+                    height: 16px;
                     position: absolute;
                     mask-position: center;
                     mask-size: contain;
@@ -295,6 +302,12 @@ Please see LICENSE files in the repository root for full details.
     }
 
     &.mx_RoomSublist_minimized {
+        .mx_RoomSublist_headerText {
+            background: none;
+            padding: 0;
+            gap: 4px;
+        }
+
         .mx_RoomSublist_headerContainer {
             height: auto;
             flex-direction: column;

@@ -7,6 +7,7 @@ Please see LICENSE files in the repository root for full details.
 */
 
 .mx_RoomHeader {
+    position: relative;
     height: 64px;
     box-sizing: border-box;
     padding: 0 var(--cpd-space-3x) 0 calc(var(--cpd-space-3x) + var(--cpd-space-1-5x));
@@ -62,6 +63,34 @@ Please see LICENSE files in the repository root for full details.
     padding: var(--cpd-space-1x);
 }
 
+.mx_RoomHeader_actions {
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-2x);
+    margin-left: auto;
+}
+
+.mx_RoomHeader_actionWrapper {
+    display: contents;
+}
+
+.mx_RoomHeader_actionWrapper > * {
+    flex: none;
+}
+
+.mx_RoomHeader_actions button {
+    width: auto;
+}
+
+.mx_RoomHeader_actions .mx_RoomHeader_members {
+    justify-content: center;
+}
+
+.mx_RoomHeader_actionsToggle {
+    display: none;
+    margin-left: var(--cpd-space-2x);
+}
+
 .mx_RoomHeader .mx_FacePile {
     color: $secondary-content;
     background: $background;
@@ -104,4 +133,64 @@ Please see LICENSE files in the repository root for full details.
 
 .mx_RoomHeader .mx_RoomHeader_toggled {
     fill: var(--cpd-color-icon-accent-primary);
+}
+
+@media screen and (max-width: 900px) {
+    .mx_RoomHeader_actions {
+        position: absolute;
+        top: calc(100% + var(--cpd-space-2x));
+        right: var(--cpd-space-2x);
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--cpd-space-2x);
+        padding: var(--cpd-space-3x);
+        min-width: 216px;
+        width: min(240px, calc(100vw - 32px));
+        background-color: var(--cpd-color-bg-canvas-elevated);
+        border-radius: 12px;
+        box-shadow: 0 20px 36px rgba(5, 23, 45, 0.32);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-8px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 7;
+    }
+
+    .mx_RoomHeader_actions.mx_RoomHeader_actions--open {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+
+    .mx_RoomHeader_actions > * {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .mx_RoomHeader_actionWrapper {
+        display: flex;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .mx_RoomHeader_actionWrapper > * {
+        flex: 1;
+    }
+
+    .mx_RoomHeader_actionWrapper button {
+        width: 100%;
+    }
+
+    .mx_RoomHeader_actions button {
+        width: 100%;
+    }
+
+    .mx_RoomHeader_actions .mx_RoomHeader_join_button {
+        width: 100%;
+    }
+
+    .mx_RoomHeader_actionsToggle {
+        display: inline-flex;
+        margin-left: auto;
+    }
 }

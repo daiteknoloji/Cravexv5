@@ -6,7 +6,8 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import React, { type JSX, useCallback, useMemo, useState } from "react";
+import React, { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import classNames from "classnames";
 import { Body as BodyText, Button, IconButton, Menu, MenuItem, Tooltip } from "@vector-im/compound-web";
 import VideoCallIcon from "@vector-im/compound-design-tokens/assets/web/icons/video-call-solid";
 import VoiceCallIcon from "@vector-im/compound-design-tokens/assets/web/icons/voice-call-solid";
@@ -14,6 +15,7 @@ import CloseCallIcon from "@vector-im/compound-design-tokens/assets/web/icons/cl
 import ThreadsIcon from "@vector-im/compound-design-tokens/assets/web/icons/threads-solid";
 import RoomInfoIcon from "@vector-im/compound-design-tokens/assets/web/icons/info-solid";
 import NotificationsIcon from "@vector-im/compound-design-tokens/assets/web/icons/notifications-solid";
+import MenuIcon from "@vector-im/compound-design-tokens/assets/web/icons/menu";
 import VerifiedIcon from "@vector-im/compound-design-tokens/assets/web/icons/verified";
 import ErrorIcon from "@vector-im/compound-design-tokens/assets/web/icons/error-solid";
 import PublicIcon from "@vector-im/compound-design-tokens/assets/web/icons/public";
@@ -54,7 +56,6 @@ import { RoomSettingsTab } from "../../dialogs/RoomSettingsDialog.tsx";
 import { useScopedRoomContext } from "../../../../contexts/ScopedRoomContext.tsx";
 import { ToggleableIcon } from "./toggle/ToggleableIcon.tsx";
 import { CurrentRightPanelPhaseContextProvider } from "../../../../contexts/CurrentRightPanelPhaseContext.tsx";
-import MobileMenuButton from "../../elements/MobileMenuButton.tsx";
 
 export default function RoomHeader({
     room,
@@ -124,7 +125,10 @@ export default function RoomHeader({
         <Tooltip label={videoCallDisabledReason ?? _t("voip|video_call")}>
             <Button
                 size="sm"
-                onClick={videoClick}
+                onClick={(ev) => {
+                    closeActionDrawer();
+                    videoClick(ev);
+                }}
                 Icon={VideoCallIcon}
                 className="mx_RoomHeader_join_button"
                 disabled={!!videoCallDisabledReason}
@@ -143,6 +147,43 @@ export default function RoomHeader({
     );
 
     const [menuOpen, setMenuOpen] = useState(false);
+    const [isActionDrawerOpen, setIsActionDrawerOpen] = useState(false);
+    const actionPanelId = "mx_RoomHeader_actionPanel";
+    const actionPanelRef = useRef<HTMLDivElement | null>(null);
+    const actionsToggleRef = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+        setIsActionDrawerOpen(false);
+    }, [room.roomId]);
+
+    const closeActionDrawer = useCallback(() => {
+        setIsActionDrawerOpen(false);
+    }, []);
+
+    const toggleActionDrawer = useCallback((ev: React.MouseEvent) => {
+        ev.stopPropagation();
+        setIsActionDrawerOpen((open) => !open);
+    }, []);
+
+    useEffect(() => {
+        if (!isActionDrawerOpen) return;
+
+        const handleOutsideClick = (event: MouseEvent): void => {
+            const target = event.target as Node;
+            if (actionPanelRef.current?.contains(target)) return;
+            if (actionsToggleRef.current?.contains(target)) return;
+            closeActionDrawer();
+        };
+
+        document.addEventListener("mousedown", handleOutsideClick);
+        return () => {
+            document.removeEventListener("mousedown", handleOutsideClick);
+        };
+    }, [isActionDrawerOpen, closeActionDrawer]);
+
+    const onActionContainerClick = useCallback((event: React.MouseEvent) => {
+        event.stopPropagation();
+    }, []);
 
     const onOpenChange = useCallback(
         (newOpen: boolean) => {
@@ -181,6 +222,7 @@ export default function RoomHeader({
                                 className="mx_RoomHeader_videoCallOption"
                                 onClick={(ev) => {
                                     setMenuOpen(false);
+                                    closeActionDrawer();
                                     videoCallClick(ev, option);
                                 }}
                                 Icon={VideoCallIcon}
@@ -193,13 +235,20 @@ export default function RoomHeader({
                 <IconButton
                     disabled={!!videoCallDisabledReason}
                     aria-label={videoCallDisabledReason ?? _t("voip|video_call")}
-                    onClick={videoClick}
+                    onClick={(ev) => {
+                        closeActionDrawer();
+                        videoClick(ev);
+                    }}
                 >
                     {callIconWithTooltip}
                 </IconButton>
             )}
         </>
     );
+
+    const actionContainerClasses = classNames("mx_RoomHeader_actions", {
+        "mx_RoomHeader_actions--open": isActionDrawerOpen,
+    });
     let voiceCallButton: JSX.Element | undefined = (
         <Tooltip label={voiceCallDisabledReason ?? _t("voip|voice_call")}>
             <IconButton
@@ -208,7 +257,10 @@ export default function RoomHeader({
                 //  - in pip view we are connected to the call but not viewing it.
                 disabled={!!voiceCallDisabledReason || isViewingCall || isConnectedToCall}
                 aria-label={voiceCallDisabledReason ?? _t("voip|voice_call")}
-                onClick={(ev) => voiceCallClick(ev, callOptions[0])}
+                onClick={(ev) => {
+                    closeActionDrawer();
+                    voiceCallClick(ev, callOptions[0]);
+                }}
             >
                 <VoiceCallIcon />
             </IconButton>
@@ -253,7 +305,6 @@ export default function RoomHeader({
         <>
             <CurrentRightPanelPhaseContextProvider roomId={room.roomId}>
                 <Flex as="header" align="center" gap="var(--cpd-space-3x)" className="mx_RoomHeader light-panel">
-                    <MobileMenuButton />
                     <WithPresenceIndicator room={room} size="8px">
                         {/* We hide this from the tabIndex list as it is a pointer shortcut and superfluous for a11y */}
                         <RoomAvatar
@@ -320,96 +371,127 @@ export default function RoomHeader({
                         </Box>
                     </button>
 
-                    {additionalButtons?.map((props) => {
-                        const label = props.label();
+                    <div
+                        id={actionPanelId}
+                        ref={actionPanelRef}
+                        className={actionContainerClasses}
+                        role="group"
+                        onClick={onActionContainerClick}
+                    >
+                        {additionalButtons?.map((props) => {
+                            const label = props.label();
 
-                        return (
-                            <Tooltip label={label} key={props.id}>
-                                <IconButton
-                                    aria-label={label}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        props.onClick();
-                                    }}
-                                >
-                                    {typeof props.icon === "function" ? props.icon() : props.icon}
-                                </IconButton>
-                            </Tooltip>
-                        );
-                    })}
+                            return (
+                                <Tooltip label={label} key={props.id}>
+                                    <IconButton
+                                        aria-label={label}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            props.onClick();
+                                            closeActionDrawer();
+                                        }}
+                                    >
+                                        {typeof props.icon === "function" ? props.icon() : props.icon}
+                                    </IconButton>
+                                </Tooltip>
+                            );
+                        })}
 
-                    {isViewingCall && <CallGuestLinkButton room={room} />}
+                        {isViewingCall && <CallGuestLinkButton room={room} />}
 
-                    {hasActiveCallSession && !isConnectedToCall && !isViewingCall ? (
-                        joinCallButton
-                    ) : (
-                        <>
-                            {!isVideoRoom && videoCallButton}
-                            {!useElementCallExclusively && !isVideoRoom && voiceCallButton}
-                        </>
-                    )}
+                        {hasActiveCallSession && !isConnectedToCall && !isViewingCall ? (
+                            joinCallButton
+                        ) : (
+                            <>
+                                {!isVideoRoom && videoCallButton}
+                                {!useElementCallExclusively && !isVideoRoom && voiceCallButton}
+                            </>
+                        )}
 
-                    {showChatButton && <VideoRoomChatButton room={room} />}
+                        {showChatButton && (
+                            <div className="mx_RoomHeader_actionWrapper" onClick={closeActionDrawer}>
+                                <VideoRoomChatButton room={room} />
+                            </div>
+                        )}
 
-                    <Tooltip label={_t("common|threads")}>
-                        <IconButton
-                            indicator={notificationLevelToIndicator(threadNotifications)}
-                            onClick={(evt) => {
-                                evt.stopPropagation();
-                                RightPanelStore.instance.showOrHidePhase(RightPanelPhases.ThreadPanel);
-                                PosthogTrackers.trackInteraction("WebRoomHeaderButtonsThreadsButton", evt);
-                            }}
-                            aria-label={_t("common|threads")}
-                        >
-                            <ToggleableIcon Icon={ThreadsIcon} phase={RightPanelPhases.ThreadPanel} />
-                        </IconButton>
-                    </Tooltip>
-                    {notificationsEnabled && (
-                        <Tooltip label={_t("notifications|enable_prompt_toast_title")}>
+                        <Tooltip label={_t("common|threads")}>
                             <IconButton
-                                indicator={notificationLevelToIndicator(globalNotificationState.level)}
+                                indicator={notificationLevelToIndicator(threadNotifications)}
                                 onClick={(evt) => {
                                     evt.stopPropagation();
-                                    RightPanelStore.instance.showOrHidePhase(RightPanelPhases.NotificationPanel);
+                                    RightPanelStore.instance.showOrHidePhase(RightPanelPhases.ThreadPanel);
+                                    PosthogTrackers.trackInteraction("WebRoomHeaderButtonsThreadsButton", evt);
+                                    closeActionDrawer();
                                 }}
-                                aria-label={_t("notifications|enable_prompt_toast_title")}
+                                aria-label={_t("common|threads")}
                             >
-                                <ToggleableIcon Icon={NotificationsIcon} phase={RightPanelPhases.NotificationPanel} />
+                                <ToggleableIcon Icon={ThreadsIcon} phase={RightPanelPhases.ThreadPanel} />
                             </IconButton>
                         </Tooltip>
-                    )}
+                        {notificationsEnabled && (
+                            <Tooltip label={_t("notifications|enable_prompt_toast_title")}>
+                                <IconButton
+                                    indicator={notificationLevelToIndicator(globalNotificationState.level)}
+                                    onClick={(evt) => {
+                                        evt.stopPropagation();
+                                        RightPanelStore.instance.showOrHidePhase(RightPanelPhases.NotificationPanel);
+                                        closeActionDrawer();
+                                    }}
+                                    aria-label={_t("notifications|enable_prompt_toast_title")}
+                                >
+                                    <ToggleableIcon Icon={NotificationsIcon} phase={RightPanelPhases.NotificationPanel} />
+                                </IconButton>
+                            </Tooltip>
+                        )}
 
-                    <Tooltip label={_t("right_panel|room_summary_card|title")}>
+                        <Tooltip label={_t("right_panel|room_summary_card|title")}>
+                            <IconButton
+                                onClick={(evt) => {
+                                    evt.stopPropagation();
+                                    RightPanelStore.instance.showOrHidePhase(RightPanelPhases.RoomSummary);
+                                    closeActionDrawer();
+                                }}
+                                aria-label={_t("right_panel|room_summary_card|title")}
+                            >
+                                <ToggleableIcon Icon={RoomInfoIcon} phase={RightPanelPhases.RoomSummary} />
+                            </IconButton>
+                        </Tooltip>
+
+                        {!isDirectMessage && (
+                            <BodyText as="div" size="sm" weight="medium">
+                                <FacePile
+                                    className="mx_RoomHeader_members"
+                                    members={members.slice(0, 3)}
+                                    size="20px"
+                                    overflow={false}
+                                    viewUserOnClick={false}
+                                    tooltipLabel={_t("room|header_face_pile_tooltip")}
+                                    onClick={(e: ButtonEvent) => {
+                                        RightPanelStore.instance.showOrHidePhase(RightPanelPhases.MemberList);
+                                        e.stopPropagation();
+                                        closeActionDrawer();
+                                    }}
+                                    aria-label={_t("common|n_members", { count: memberCount })}
+                                >
+                                    {formatCount(memberCount)}
+                                </FacePile>
+                            </BodyText>
+                        )}
+                    </div>
+
+                    <Tooltip label={_t("action|open_menu")}>
                         <IconButton
-                            onClick={(evt) => {
-                                evt.stopPropagation();
-                                RightPanelStore.instance.showOrHidePhase(RightPanelPhases.RoomSummary);
-                            }}
-                            aria-label={_t("right_panel|room_summary_card|title")}
+                            ref={actionsToggleRef}
+                            className="mx_RoomHeader_actionsToggle"
+                            aria-expanded={isActionDrawerOpen}
+                            aria-controls={actionPanelId}
+                            aria-haspopup="true"
+                            aria-label={_t("action|open_menu")}
+                            onClick={toggleActionDrawer}
                         >
-                            <ToggleableIcon Icon={RoomInfoIcon} phase={RightPanelPhases.RoomSummary} />
+                            <MenuIcon />
                         </IconButton>
                     </Tooltip>
-
-                    {!isDirectMessage && (
-                        <BodyText as="div" size="sm" weight="medium">
-                            <FacePile
-                                className="mx_RoomHeader_members"
-                                members={members.slice(0, 3)}
-                                size="20px"
-                                overflow={false}
-                                viewUserOnClick={false}
-                                tooltipLabel={_t("room|header_face_pile_tooltip")}
-                                onClick={(e: ButtonEvent) => {
-                                    RightPanelStore.instance.showOrHidePhase(RightPanelPhases.MemberList);
-                                    e.stopPropagation();
-                                }}
-                                aria-label={_t("common|n_members", { count: memberCount })}
-                            >
-                                {formatCount(memberCount)}
-                            </FacePile>
-                        </BodyText>
-                    )}
                 </Flex>
                 {askToJoinEnabled && <RoomKnocksBar room={room} />}
             </CurrentRightPanelPhaseContextProvider>
