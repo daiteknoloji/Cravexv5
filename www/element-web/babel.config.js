@@ -2,6 +2,13 @@ module.exports = {
     sourceMaps: true,
     presets: [
         [
+            "@babel/preset-typescript",
+            {
+                allowDeclareFields: true,
+                allowNamespaces: true,
+            },
+        ],
+        [
             "@babel/preset-env",
             {
                 targets: [
@@ -13,19 +20,11 @@ module.exports = {
                 include: ["@babel/plugin-transform-class-properties"],
             },
         ],
-        [
-            "@babel/preset-typescript",
-            {
-                allowDeclareFields: true,
-                allowNamespaces: true,
-            },
-        ],
         "@babel/preset-react",
     ],
     plugins: [
-        // Private methods/fields must be BEFORE decorators
-        "@babel/plugin-transform-private-methods", // required for TypeScript private methods
-        "@babel/plugin-transform-private-property-in-object", // required for TypeScript private fields
+        // IMPORTANT: @babel/preset-typescript runs first (in presets array above)
+        // Then class-related plugins can run
         
         "@babel/plugin-proposal-export-default-from",
         "@babel/plugin-transform-numeric-separator",
@@ -41,6 +40,11 @@ module.exports = {
 
         "@babel/plugin-syntax-dynamic-import",
         "@babel/plugin-transform-runtime",
+        
+        // Private methods/fields must be BEFORE decorators but AFTER TypeScript preset
+        "@babel/plugin-transform-private-methods", // required for TypeScript private methods
+        "@babel/plugin-transform-private-property-in-object", // required for TypeScript private fields
+        
         ["@babel/plugin-proposal-decorators", { version: "2023-11" }], // only needed by the js-sdk
         "@babel/plugin-transform-class-static-block", // only needed by the js-sdk for decorators
     ],
