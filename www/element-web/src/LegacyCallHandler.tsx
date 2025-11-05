@@ -456,7 +456,12 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
                     const turnServers = MatrixClientPeg.safeGet().getTurnServers();
                     logger.error(`[ICE Debug] Available TURN servers: ${turnServers.length}`);
                     turnServers.forEach((server, index) => {
-                        logger.error(`[ICE Debug] TURN Server ${index + 1}:`, server.uris);
+                        logger.error(`[ICE Debug] TURN Server ${index + 1}:`, {
+                            uris: server.uris,
+                            username: server.username,
+                            credential: server.credential ? "***" : "missing",
+                            fullServer: server,
+                        });
                     });
                 }
             });
