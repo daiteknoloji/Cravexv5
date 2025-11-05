@@ -17,14 +17,17 @@ module.exports = {
                     "last 2 Safari versions",
                     "last 2 Edge versions",
                 ],
-                // REMOVED: include: ["@babel/plugin-transform-class-properties"]
-                // This is now explicitly added to plugins array below to ensure correct order
+                // CRITICAL: Exclude class-properties from preset-env
+                // It will be added explicitly to plugins array AFTER TypeScript preset processes declare fields
+                exclude: ["@babel/plugin-transform-class-properties"],
             },
         ],
         "@babel/preset-react",
     ],
     plugins: [
-        // IMPORTANT: @babel/preset-typescript runs first (in presets array above)
+        // IMPORTANT: Babel processes presets in REVERSE order
+        // So @babel/preset-typescript (first in array) runs LAST among presets
+        // This ensures TypeScript processes declare fields before plugins run
         // Then class-related plugins must run in this specific order:
         // 1. class-properties (handles regular class fields)
         // 2. private-methods (handles private methods)
