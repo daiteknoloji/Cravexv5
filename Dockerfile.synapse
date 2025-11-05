@@ -4,12 +4,13 @@ FROM matrixdotorg/synapse:latest
 # Config dosyasını direkt /data dizinine kopyala (Synapse'in beklediği yer)
 COPY synapse-railway-config/homeserver.yaml /data/homeserver.yaml
 
-# Başlangıç scripti - init script olarak kullan
-COPY synapse-railway-config/start.sh /docker-entrypoint-init.d/start.sh
-RUN chmod +x /docker-entrypoint-init.d/start.sh && \
-    sed -i 's/\r$//' /docker-entrypoint-init.d/start.sh || true
+# Başlangıç scripti - entrypoint olarak kullan
+COPY synapse-railway-config/start.sh /start.sh
+RUN chmod +x /start.sh && \
+    sed -i 's/\r$//' /start.sh || true
 
 EXPOSE 8008
 
-# Synapse'in kendi entrypoint'ini kullan (python3 -m synapse.app.homeserver)
-# start.sh init script olarak çalışacak
+# start.sh script'ini entrypoint olarak ayarla
+# Bu script environment variables'ı kullanarak homeserver.yaml'ı güncelleyecek
+ENTRYPOINT ["/start.sh"]
