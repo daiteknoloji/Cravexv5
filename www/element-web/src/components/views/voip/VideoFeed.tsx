@@ -114,9 +114,26 @@ export default class VideoFeed extends React.PureComponent<IProps, IState> {
     private async playMedia(): Promise<void> {
         const element = this.element;
         if (!element) return;
+
+        const stream = this.props.feed.stream ?? null;
+        if (!stream) {
+            this.stopMedia();
+            return;
+        }
+
+        const currentStream = element.srcObject as MediaStream | null;
+        if (!currentStream || currentStream.id !== stream.id) {
+            element.pause();
+            element.srcObject = null;
+            element.removeAttribute("src");
+            element.srcObject = stream;
+        }
+
         // We play audio in AudioFeed, not here
         element.muted = true;
+
         element.srcObject = this.props.feed.stream ?? null;
+
         element.autoplay = true;
         try {
             // A note on calling methods on media elements:

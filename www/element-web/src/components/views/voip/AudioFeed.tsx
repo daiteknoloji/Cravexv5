@@ -97,9 +97,27 @@ export default class AudioFeed extends React.Component<IProps, IState> {
     private async playMedia(): Promise<void> {
         const element = this.element.current;
         if (!element) return;
+
+        const stream = this.props.feed.stream ?? null;
+        if (!stream) {
+            this.stopMedia();
+            return;
+        }
+
+        const currentStream = element.srcObject as MediaStream | null;
+        if (!currentStream || currentStream.id !== stream.id) {
+            element.pause();
+            element.srcObject = null;
+            element.removeAttribute("src");
+            element.srcObject = stream;
+        }
+
         this.onAudioOutputChanged(MediaDeviceHandler.getAudioOutput());
         element.muted = false;
+
+
         element.srcObject = this.props.feed.stream ?? null;
+
         element.autoplay = true;
 
         try {
