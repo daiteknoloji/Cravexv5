@@ -1,7 +1,7 @@
 {
     "default_server_config": {
         "m.homeserver": {
-            "base_url": "https://cravex1-production.up.railway.app",
+            "base_url": "https://cozy-dragon-54547b.netlify.app",
             "server_name": "cravex1-production.up.railway.app"
         }
     },
@@ -49,13 +49,6 @@
                 ],
                 "username": "openrelayproject",
                 "credential": "openrelayproject"
-            },
-            {
-                "urls": [
-                    "turn:turn-server-production-2809.up.railway.app:3478?transport=tcp"
-                ],
-                "username": "webrtc",
-                "credential": "secret"
             },
             {
                 "urls": [
