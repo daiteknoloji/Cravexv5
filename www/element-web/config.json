@@ -99,6 +99,10 @@
         "available": false
     },
     "show_mobile_guide": false,
-    "permalink_prefix": "https://matrix.to"
+    "permalink_prefix": "https://matrix.to",
+    "branding": {
+        "welcome_background_url": "",
+        "auth_footer_links": []
+    }
 }
 

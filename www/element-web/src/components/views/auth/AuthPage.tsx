@@ -13,59 +13,71 @@ import SdkConfig from "../../../SdkConfig";
 import AuthFooter from "./AuthFooter";
 
 export default class AuthPage extends React.PureComponent<React.PropsWithChildren> {
-    private static welcomeBackgroundUrl?: string;
+    private static welcomeBackgroundUrl?: string | null;
 
     // cache the url as a static to prevent it changing without refreshing
-    private static getWelcomeBackgroundUrl(): string {
-        if (AuthPage.welcomeBackgroundUrl) return AuthPage.welcomeBackgroundUrl;
+    private static getWelcomeBackgroundUrl(): string | null {
+        if (AuthPage.welcomeBackgroundUrl !== undefined) return AuthPage.welcomeBackgroundUrl || null;
 
         const brandingConfig = SdkConfig.getObject("branding");
-        AuthPage.welcomeBackgroundUrl = "themes/element/img/backgrounds/lake.jpg";
-
         const configuredUrl = brandingConfig?.get("welcome_background_url");
+        
         if (configuredUrl) {
             if (Array.isArray(configuredUrl)) {
                 const index = Math.floor(Math.random() * configuredUrl.length);
-                AuthPage.welcomeBackgroundUrl = configuredUrl[index];
+                AuthPage.welcomeBackgroundUrl = configuredUrl[index] || null;
             } else {
-                AuthPage.welcomeBackgroundUrl = configuredUrl;
+                AuthPage.welcomeBackgroundUrl = configuredUrl || null;
             }
+        } else {
+            // Boş string veya yoksa null döndür (beyaz arka plan için)
+            AuthPage.welcomeBackgroundUrl = null;
         }
 
         return AuthPage.welcomeBackgroundUrl;
     }
 
     public render(): React.ReactElement {
-        const pageStyle = {
-            background: `center/cover fixed url(${AuthPage.getWelcomeBackgroundUrl()})`,
-        };
+        // Beyaz arka plan - welcome_background_url boşsa
+        const welcomeBackgroundUrl = AuthPage.getWelcomeBackgroundUrl();
+        const pageStyle = welcomeBackgroundUrl
+            ? {
+                  background: `center/cover fixed url(${welcomeBackgroundUrl})`,
+              }
+            : {
+                  background: "#ffffff",
+              };
 
         const modalStyle: React.CSSProperties = {
             position: "relative",
             background: "initial",
         };
 
-        const blurStyle: React.CSSProperties = {
-            position: "absolute",
-            top: 0,
-            right: 0,
-            bottom: 0,
-            left: 0,
-            filter: "blur(40px)",
-            background: pageStyle.background,
-        };
+        const blurStyle: React.CSSProperties = welcomeBackgroundUrl
+            ? {
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  left: 0,
+                  filter: "blur(40px)",
+                  background: pageStyle.background,
+              }
+            : {
+                  display: "none",
+              };
 
         const modalContentStyle: React.CSSProperties = {
             display: "flex",
             zIndex: 1,
-            background: "rgba(255, 255, 255, 0.59)",
+            background: welcomeBackgroundUrl ? "rgba(255, 255, 255, 0.59)" : "#ffffff",
             borderRadius: "8px",
         };
 
         return (
             <div className="mx_AuthPage" style={pageStyle}>
                 <div className="mx_AuthPage_modal" style={modalStyle}>
-                    <div className="mx_AuthPage_modalBlur" style={blurStyle} />
+                    {welcomeBackgroundUrl && <div className="mx_AuthPage_modalBlur" style={blurStyle} />}
                     <div className="mx_AuthPage_modalContent" style={modalContentStyle}>
                         {this.props.children}
                     </div>
