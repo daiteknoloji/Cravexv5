@@ -24,14 +24,6 @@ module.exports = {
             {
                 allowDeclareFields: true,
                 allowNamespaces: true,
-                // CRITICAL: Explicitly configure parser to handle TypeScript syntax
-                // This ensures parser recognizes 'private' keyword and other TypeScript features
-                parserOpts: {
-                    plugins: [
-                        "typescript",      // Enable TypeScript parsing mode
-                        "jsx",            // Enable JSX parsing
-                    ],
-                },
             },
         ],
     ],

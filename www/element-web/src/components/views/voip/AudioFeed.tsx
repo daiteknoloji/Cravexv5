@@ -23,93 +23,34 @@ interface IState {
 export default class AudioFeed extends React.Component<IProps, IState> {
     private element = createRef<HTMLAudioElement>();
 
-    public constructor(props: IProps) {
-        super(props);
-
-        this.state = {
-            audioMuted: this.props.feed.isAudioMuted(),
-        };
-    }
-
-    public componentDidMount(): void {
-        MediaDeviceHandler.instance.addListener(MediaDeviceHandlerEvent.AudioOutputChanged, this.onAudioOutputChanged);
-        this.props.feed.addListener(CallFeedEvent.NewStream, this.onNewStream);
-        this.props.feed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
-        this.playMedia();
-    }
-
-    public componentWillUnmount(): void {
-        MediaDeviceHandler.instance.removeListener(
-            MediaDeviceHandlerEvent.AudioOutputChanged,
-            this.onAudioOutputChanged,
-        );
-        this.props.feed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
-        this.props.feed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
-        this.stopMedia();
-    }
-
-    public componentDidUpdate(prevProps: IProps, prevState: IState): void {
-        if (prevProps.feed !== this.props.feed) {
-            prevProps.feed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
-            prevProps.feed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
-
-            this.props.feed.addListener(CallFeedEvent.NewStream, this.onNewStream);
-            this.props.feed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
-
-            const audioMuted = this.props.feed.isAudioMuted();
-            if (audioMuted !== this.state.audioMuted) {
-                this.setState({ audioMuted });
-                return;
-            }
-
-            if (audioMuted) this.stopMedia();
-            else this.playMedia();
-            return;
-        }
-
-        if (prevState.audioMuted !== this.state.audioMuted) {
-            if (this.state.audioMuted) this.stopMedia();
-            else this.playMedia();
-            return;
-        }
-
-        if (!this.state.audioMuted && prevProps.feed.stream !== this.props.feed.stream) {
-            this.playMedia();
-        }
-    }
-
-    private onAudioOutputChanged = (audioOutput: string): void => {
+    // ECMAScript # private helpers for media control
+    #stopMedia = (): void => {
         const element = this.element.current;
-        if (audioOutput) {
-            try {
-                // This seems quite unreliable in Chrome, although I haven't yet managed to make a jsfiddle where
-                // it fails.
-                // It seems reliable if you set the sink ID after setting the srcObject and then set the sink ID
-                // back to the default after the call is over - Dave
-                element!.setSinkId(audioOutput);
-            } catch (e) {
-                logger.error("Couldn't set requested audio output device: using default", e);
-                logger.warn("Couldn't set requested audio output device: using default", e);
-            }
-        }
+        if (!element) return;
+
+        element.pause();
+        element.srcObject = null;
+        element.removeAttribute("src");
+
+        // As per comment in componentDidMount, setting the sink ID back to the
+        // default once the call is over makes setSinkId work reliably. - Dave
+        // Since we are not using the same element anymore, the above doesn't
+        // seem to be necessary - Šimon
     };
 
-    private async playMedia(): Promise<void> {
+    #playMedia = async (): Promise<void> => {
         const element = this.element.current;
         if (!element) return;
 
         const stream = this.props.feed.stream ?? null;
         if (!stream) {
-            this.stopMedia();
+            this.#stopMedia();
             return;
         }
 
         const currentStream = element.srcObject as MediaStream | null;
 
-        if (currentStream !== stream) {
-
         if (!currentStream || currentStream.id !== stream.id) {
-
             element.pause();
             element.srcObject = null;
             element.removeAttribute("src");
@@ -119,10 +60,7 @@ export default class AudioFeed extends React.Component<IProps, IState> {
         this.onAudioOutputChanged(MediaDeviceHandler.getAudioOutput());
         element.muted = false;
 
-
-
         element.srcObject = this.props.feed.stream ?? null;
-
 
         element.autoplay = true;
 
@@ -144,21 +82,79 @@ export default class AudioFeed extends React.Component<IProps, IState> {
                 e,
             );
         }
+    };
+
+    public constructor(props: IProps) {
+        super(props);
+
+        this.state = {
+            audioMuted: this.props.feed.isAudioMuted(),
+        };
     }
 
-    private stopMedia(): void {
+    public componentDidMount(): void {
+        MediaDeviceHandler.instance.addListener(MediaDeviceHandlerEvent.AudioOutputChanged, this.onAudioOutputChanged);
+        this.props.feed.addListener(CallFeedEvent.NewStream, this.onNewStream);
+        this.props.feed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+        this.#playMedia();
+    }
+
+    public componentWillUnmount(): void {
+        MediaDeviceHandler.instance.removeListener(
+            MediaDeviceHandlerEvent.AudioOutputChanged,
+            this.onAudioOutputChanged,
+        );
+        this.props.feed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
+        this.props.feed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+        this.#stopMedia();
+    }
+
+    public componentDidUpdate(prevProps: IProps, prevState: IState): void {
+        if (prevProps.feed !== this.props.feed) {
+            prevProps.feed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
+            prevProps.feed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+
+            this.props.feed.addListener(CallFeedEvent.NewStream, this.onNewStream);
+            this.props.feed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+
+            const audioMuted = this.props.feed.isAudioMuted();
+            if (audioMuted !== this.state.audioMuted) {
+                this.setState({ audioMuted });
+                return;
+            }
+
+            if (audioMuted) this.#stopMedia();
+            else this.#playMedia();
+            return;
+        }
+
+        if (prevState.audioMuted !== this.state.audioMuted) {
+            if (this.state.audioMuted) this.#stopMedia();
+            else this.#playMedia();
+            return;
+        }
+
+        if (!this.state.audioMuted && prevProps.feed.stream !== this.props.feed.stream) {
+            this.#playMedia();
+        }
+    }
+
+    private onAudioOutputChanged = (audioOutput: string): void => {
         const element = this.element.current;
-        if (!element) return;
+        if (audioOutput) {
+            try {
+                // This seems quite unreliable in Chrome, although I haven't yet managed to make a jsfiddle where
+                // it fails.
+                // It seems reliable if you set the sink ID after setting the srcObject and then set the sink ID
+                // back to the default after the call is over - Dave
+                element!.setSinkId(audioOutput);
+            } catch (e) {
+                logger.error("Couldn't set requested audio output device: using default", e);
+                logger.warn("Couldn't set requested audio output device: using default", e);
+            }
+        }
+    };
 
-        element.pause();
-        element.srcObject = null;
-        element.removeAttribute("src");
-
-        // As per comment in componentDidMount, setting the sink ID back to the
-        // default once the call is over makes setSinkId work reliably. - Dave
-        // Since we are not using the same element anymore, the above doesn't
-        // seem to be necessary - Šimon
-    }
 
     private onNewStream = (): void => {
         const audioMuted = this.props.feed.isAudioMuted();
@@ -167,14 +163,14 @@ export default class AudioFeed extends React.Component<IProps, IState> {
             return;
         }
 
-        if (!audioMuted) this.playMedia();
+        if (!audioMuted) this.#playMedia();
     };
 
     private onMuteStateChanged = (): void => {
         const audioMuted = this.props.feed.isAudioMuted();
         if (audioMuted === this.state.audioMuted) {
-            if (audioMuted) this.stopMedia();
-            else this.playMedia();
+            if (audioMuted) this.#stopMedia();
+            else this.#playMedia();
             return;
         }
 
