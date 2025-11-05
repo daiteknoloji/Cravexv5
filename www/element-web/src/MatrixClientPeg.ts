@@ -14,6 +14,7 @@ import {
     EventTimelineSet,
     type ICreateClientOpts,
     type IStartClientOpts,
+    type IClientTurnServer,
     type MatrixClient,
     MemoryStore,
     PendingEventOrdering,
@@ -499,6 +500,23 @@ class MatrixClientPegClass implements IMatrixClientPeg {
 
         this.matrixClient = createMatrixClient(opts);
         this.matrixClient.setGuest(Boolean(creds.guest));
+
+        // Override getTurnServers() to return config.json TURN servers instead of Synapse's
+        // This ensures MediaHandler uses our Metered.ca credentials instead of Synapse-generated ones
+        if (iceServers.length > 0) {
+            const originalGetTurnServers = this.matrixClient.getTurnServers.bind(this.matrixClient);
+            this.matrixClient.getTurnServers = (): IClientTurnServer[] => {
+                // Return config.json TURN servers in the format expected by matrix-js-sdk
+                const turnServers: IClientTurnServer[] = iceServers.map((server) => ({
+                    urls: Array.isArray(server.urls) ? server.urls : [server.urls],
+                    username: server.username,
+                    credential: server.credential,
+                }));
+                
+                logger.log("[TURN Debug] getTurnServers() returning config.json servers:", turnServers);
+                return turnServers;
+            };
+        }
 
         const notifTimelineSet = new EventTimelineSet(undefined, {
             timelineSupport: true,
