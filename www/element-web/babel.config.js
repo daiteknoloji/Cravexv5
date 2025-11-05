@@ -33,5 +33,7 @@ module.exports = {
         "@babel/plugin-transform-runtime",
         ["@babel/plugin-proposal-decorators", { version: "2023-11" }], // only needed by the js-sdk
         "@babel/plugin-transform-class-static-block", // only needed by the js-sdk for decorators
+        "@babel/plugin-transform-private-methods", // required for TypeScript private methods
+        "@babel/plugin-transform-private-property-in-object", // required for TypeScript private fields
     ],
 };

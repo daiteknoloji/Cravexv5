@@ -93,18 +93,19 @@ export default class VideoFeed extends React.PureComponent<IProps, IState> {
         if (oldFeed === newFeed) return;
 
         if (oldFeed) {
-            this.props.feed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
-            this.props.feed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
-            if (this.props.feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
-                this.props.feed.measureVolumeActivity(false);
+            oldFeed.removeListener(CallFeedEvent.NewStream, this.onNewStream);
+            oldFeed.removeListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+            if (oldFeed.purpose === SDPStreamMetadataPurpose.Usermedia) {
+                oldFeed.measureVolumeActivity(false);
             }
             this.stopMedia();
         }
+
         if (newFeed) {
-            this.props.feed.addListener(CallFeedEvent.NewStream, this.onNewStream);
-            this.props.feed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
-            if (this.props.feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
-                this.props.feed.measureVolumeActivity(true);
+            newFeed.addListener(CallFeedEvent.NewStream, this.onNewStream);
+            newFeed.addListener(CallFeedEvent.MuteStateChanged, this.onMuteStateChanged);
+            if (newFeed.purpose === SDPStreamMetadataPurpose.Usermedia) {
+                newFeed.measureVolumeActivity(true);
             }
             this.playMedia();
         }
@@ -113,9 +114,26 @@ export default class VideoFeed extends React.PureComponent<IProps, IState> {
     private async playMedia(): Promise<void> {
         const element = this.element;
         if (!element) return;
+
+        const stream = this.props.feed.stream ?? null;
+        if (!stream) {
+            this.stopMedia();
+            return;
+        }
+
+        const currentStream = element.srcObject as MediaStream | null;
+        if (!currentStream || currentStream.id !== stream.id) {
+            element.pause();
+            element.srcObject = null;
+            element.removeAttribute("src");
+            element.srcObject = stream;
+        }
+
         // We play audio in AudioFeed, not here
         element.muted = true;
-        element.srcObject = this.props.feed.stream;
+
+        element.srcObject = this.props.feed.stream ?? null;
+
         element.autoplay = true;
         try {
             // A note on calling methods on media elements:
@@ -142,6 +160,7 @@ export default class VideoFeed extends React.PureComponent<IProps, IState> {
         if (!element) return;
 
         element.pause();
+        element.srcObject = null;
         element.removeAttribute("src");
 
         // As per comment in componentDidMount, setting the sink ID back to the
