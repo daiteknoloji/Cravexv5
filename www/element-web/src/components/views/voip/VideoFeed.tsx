@@ -131,6 +131,9 @@ export default class VideoFeed extends React.PureComponent<IProps, IState> {
 
         // We play audio in AudioFeed, not here
         element.muted = true;
+
+        element.srcObject = this.props.feed.stream ?? null;
+
         element.autoplay = true;
         try {
             // A note on calling methods on media elements:
