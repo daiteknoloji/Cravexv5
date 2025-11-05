@@ -476,14 +476,26 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
             // Monitor ICE candidates
             pc.addEventListener('icecandidate', (e) => {
                 if (e.candidate) {
+                    const candidateStr = e.candidate.candidate;
+                    const isRelay = candidateStr.includes('typ relay') || candidateStr.includes('relay');
                     logger.log(`[ICE Debug] ICE Candidate received:`, {
-                        candidate: e.candidate.candidate,
+                        candidate: candidateStr,
                         type: e.candidate.type,
                         protocol: e.candidate.protocol,
                         priority: e.candidate.priority,
+                        isRelay: isRelay, // TURN server kullanılıyor mu?
+                        isRelayCandidate: e.candidate.type === 'relay', // Direct type check
                     });
+                    if (isRelay || e.candidate.type === 'relay') {
+                        logger.log(`[ICE Debug] ✅ TURN server kullanılıyor! Relay candidate bulundu.`);
+                    }
                 } else {
                     logger.log(`[ICE Debug] ICE Candidate gathering complete`);
+                    
+                    // Final ICE connection state kontrolü
+                    logger.log(`[ICE Debug] Final ICE Connection State: ${pc.iceConnectionState}`);
+                    logger.log(`[ICE Debug] Final ICE Gathering State: ${pc.iceGatheringState}`);
+                    logger.log(`[ICE Debug] Final Signaling State: ${pc.signalingState}`);
                 }
             });
 
