@@ -432,6 +432,61 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
     private setCallListeners(call: MatrixCall): void {
         let mappedRoomId = this.roomIdForCall(call);
 
+        // Debug: Monitor ICE connection state changes
+        const setupIceMonitoring = () => {
+            if (!call.peerConn) {
+                // Wait for peerConn to be created
+                setTimeout(setupIceMonitoring, 100);
+                return;
+            }
+
+            const pc = call.peerConn;
+            logger.log(`[ICE Debug] Setting up ICE monitoring for call ${call.callId}`);
+            logger.log(`[ICE Debug] Initial ICE state: ${pc.iceConnectionState}, Gathering: ${pc.iceGatheringState}, Signaling: ${pc.signalingState}`);
+
+            // Monitor ICE connection state changes
+            pc.addEventListener('iceconnectionstatechange', () => {
+                logger.log(`[ICE Debug] ICE Connection State changed: ${pc.iceConnectionState}`);
+                if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                    logger.error(`[ICE Debug] ICE Connection failed or disconnected!`);
+                    logger.error(`[ICE Debug] ICE Gathering State: ${pc.iceGatheringState}`);
+                    logger.error(`[ICE Debug] Signaling State: ${pc.signalingState}`);
+                    
+                    // Log TURN servers
+                    const turnServers = MatrixClientPeg.safeGet().getTurnServers();
+                    logger.error(`[ICE Debug] Available TURN servers: ${turnServers.length}`);
+                    turnServers.forEach((server, index) => {
+                        logger.error(`[ICE Debug] TURN Server ${index + 1}:`, server.uris);
+                    });
+                }
+            });
+
+            // Monitor ICE gathering state changes
+            pc.addEventListener('icegatheringstatechange', () => {
+                logger.log(`[ICE Debug] ICE Gathering State changed: ${pc.iceGatheringState}`);
+            });
+
+            // Monitor ICE candidates
+            pc.addEventListener('icecandidate', (e) => {
+                if (e.candidate) {
+                    logger.log(`[ICE Debug] ICE Candidate received:`, {
+                        candidate: e.candidate.candidate,
+                        type: e.candidate.type,
+                        protocol: e.candidate.protocol,
+                        priority: e.candidate.priority,
+                    });
+                } else {
+                    logger.log(`[ICE Debug] ICE Candidate gathering complete`);
+                }
+            });
+
+            // Monitor connection state changes
+            pc.addEventListener('connectionstatechange', () => {
+                logger.log(`[ICE Debug] Connection State changed: ${pc.connectionState}`);
+            });
+        };
+        setupIceMonitoring();
+
         call.on(CallEvent.Error, (err: CallError) => {
             if (!this.matchesCallForThisRoom(call)) return;
 
@@ -466,6 +521,12 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
         });
         call.on(CallEvent.Hangup, () => {
             if (!mappedRoomId || !this.matchesCallForThisRoom(call)) return;
+
+            logger.log(`[ICE Debug] Call hangup received for call ${call.callId}`);
+            if (call.peerConn) {
+                logger.log(`[ICE Debug] Final ICE state: ${call.peerConn.iceConnectionState}`);
+                logger.log(`[ICE Debug] Hangup reason: ${call.hangupReason}`);
+            }
 
             if (isNotNull(mappedRoomId)) {
                 this.removeCallForRoom(mappedRoomId);
@@ -783,6 +844,14 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
                 credential: server.credential ? "***" : "missing",
             });
         });
+
+        // Debug: Fetch and log TURN server response directly
+        try {
+            const turnResponse = await cli.getTurnServers();
+            logger.log("[TURN Debug] TURN server response from client:", JSON.stringify(turnResponse, null, 2));
+        } catch (err) {
+            logger.error("[TURN Debug] Failed to get TURN servers:", err);
+        }
         
         const call = cli.createCall(roomId)!;
 
