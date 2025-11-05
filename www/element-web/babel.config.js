@@ -18,7 +18,8 @@ module.exports = {
             {
                 allowDeclareFields: true,
                 allowNamespaces: true,
-                // Ensure TypeScript parser handles private methods correctly
+                // allExtensions: true enables TSX parsing for all file extensions
+                allExtensions: true,
                 isTSX: true,
             },
         ],
