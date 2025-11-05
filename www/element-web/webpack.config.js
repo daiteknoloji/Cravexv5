@@ -291,8 +291,6 @@ module.exports = (env, argv) => {
                             plugins: [
                                 "typescript",
                                 "jsx",
-                                "decorators-legacy",
-                                "classProperties",
                                 "privateMethods",
                                 "privateIn",
                             ],
