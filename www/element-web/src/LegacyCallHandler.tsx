@@ -443,6 +443,15 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
             const pc = call.peerConn;
             logger.log(`[ICE Debug] Setting up ICE monitoring for call ${call.callId}`);
             logger.log(`[ICE Debug] Initial ICE state: ${pc.iceConnectionState}, Gathering: ${pc.iceGatheringState}, Signaling: ${pc.signalingState}`);
+            
+            // Log PeerConnection configuration (ICE servers)
+            try {
+                const config = pc.getConfiguration();
+                logger.log(`[ICE Debug] PeerConnection ICE Servers:`, config.iceServers);
+                logger.log(`[ICE Debug] PeerConnection ICE Servers count:`, config.iceServers?.length || 0);
+            } catch (e) {
+                logger.error(`[ICE Debug] Failed to get PeerConnection configuration:`, e);
+            }
 
             // Monitor ICE connection state changes
             pc.addEventListener('iceconnectionstatechange', () => {
