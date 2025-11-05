@@ -105,7 +105,11 @@ export default class AudioFeed extends React.Component<IProps, IState> {
         }
 
         const currentStream = element.srcObject as MediaStream | null;
+
         if (currentStream !== stream) {
+
+        if (!currentStream || currentStream.id !== stream.id) {
+
             element.pause();
             element.srcObject = null;
             element.removeAttribute("src");
@@ -114,6 +118,12 @@ export default class AudioFeed extends React.Component<IProps, IState> {
 
         this.onAudioOutputChanged(MediaDeviceHandler.getAudioOutput());
         element.muted = false;
+
+
+
+        element.srcObject = this.props.feed.stream ?? null;
+
+
         element.autoplay = true;
 
         try {

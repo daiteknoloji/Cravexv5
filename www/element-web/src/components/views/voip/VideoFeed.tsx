@@ -122,7 +122,11 @@ export default class VideoFeed extends React.PureComponent<IProps, IState> {
         }
 
         const currentStream = element.srcObject as MediaStream | null;
+
         if (currentStream !== stream) {
+
+        if (!currentStream || currentStream.id !== stream.id) {
+
             element.pause();
             element.srcObject = null;
             element.removeAttribute("src");
@@ -131,6 +135,11 @@ export default class VideoFeed extends React.PureComponent<IProps, IState> {
 
         // We play audio in AudioFeed, not here
         element.muted = true;
+
+
+        element.srcObject = this.props.feed.stream ?? null;
+
+
         element.autoplay = true;
         try {
             // A note on calling methods on media elements:
