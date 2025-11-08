@@ -25,6 +25,7 @@ module.exports = {
                 allowDeclareFields: true,
                 allowNamespaces: true,
                 isTSX: true, // ✅ TSX parsing için kritik - TypeScript private keyword'lerini parse edebilmek için
+                allExtensions: true, // ✅ isTSX:true kullanıldığında zorunlu - tüm dosya uzantılarını TypeScript olarak işle
             },
         ],
     ],
@@ -38,6 +39,7 @@ module.exports = {
                 allowDeclareFields: true,
                 allowNamespaces: true,
                 isTSX: true, // ✅ TSX parsing için kritik
+                allExtensions: true, // ✅ isTSX:true kullanıldığında zorunlu
             },
         ],
         
