@@ -21,14 +21,14 @@
 # ÖNEMLİ: Bu redirects, catch-all redirect'ten ÖNCE olmalı
 [[redirects]]
   from = "/_matrix/*"
-  to = "https://cravex1-production.up.railway.app/_matrix/:splat"
+  to = "https://matrix-synapse-production.up.railway.app/_matrix/:splat"
   status = 200
   force = true
   headers = {X-From = "Netlify"}
   
 [[redirects]]
   from = "/.well-known/*"
-  to = "https://cravex1-production.up.railway.app/.well-known/:splat"
+  to = "https://matrix-synapse-production.up.railway.app/.well-known/:splat"
   status = 200
   force = true
   headers = {X-From = "Netlify"}
