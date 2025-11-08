@@ -52,6 +52,7 @@ import {
   useListContext,
   Identifier,
 } from "react-admin";
+import React from "react";
 import { Link } from "react-router-dom";
 
 import AvatarField from "../components/AvatarField";
@@ -120,6 +121,13 @@ const UserDeleteButton = (props: DeleteWithConfirmButtonProps) => {
       redirect={false}
       icon={<DeleteIcon />}
       size="small"
+      sx={{
+        minWidth: 'auto',
+        padding: '4px 8px',
+      }}
+      onClick={(e: React.MouseEvent) => {
+        e.stopPropagation();
+      }}
     />
   );
 };
