@@ -1,8 +1,8 @@
 {
     "default_server_config": {
         "m.homeserver": {
-            "base_url": "https://cozy-dragon-54547b.netlify.app",
-            "server_name": "cravex1-production.up.railway.app"
+            "base_url": "https://matrix-synapse-production.up.railway.app",
+            "server_name": "matrix-synapse-production.up.railway.app"
         }
     },
     "disable_custom_urls": false,
