@@ -30,19 +30,8 @@ module.exports = {
         ],
     ],
     plugins: [
-        // CRITICAL: Add TypeScript plugin explicitly BEFORE class-properties to ensure declare fields are transformed
-        // Even though TypeScript preset runs first (because it's last in presets array), we need to ensure
-        // that the TypeScript plugin specifically removes declare fields before class-properties plugin runs
-        // CRITICAL: @babel/plugin-transform-typescript does NOT support isTSX/allExtensions
-        // These options are ONLY valid for @babel/preset-typescript (which is already configured above)
-        // Having them here causes Babel to ignore the plugin or fail silently
-        [
-            "@babel/plugin-transform-typescript",
-            {
-                allowDeclareFields: true,
-                allowNamespaces: true,
-            },
-        ],
+        // NOTE: @babel/preset-typescript already includes @babel/plugin-transform-typescript internally
+        // We don't need to add it explicitly here. The preset handles TSX files via isTSX:true option.
         
         "@babel/plugin-proposal-export-default-from",
         "@babel/plugin-transform-numeric-separator",
@@ -63,9 +52,10 @@ module.exports = {
         "@babel/plugin-syntax-dynamic-import",
         "@babel/plugin-transform-runtime",
         
-        // Class-related plugins - MUST run AFTER @babel/plugin-transform-typescript
+        // Class-related plugins - MUST run AFTER TypeScript preset processes declare fields
+        // The TypeScript preset (which runs first) handles declare fields, then these plugins transform class features
         // Order is critical: class-properties -> private-methods -> private-property-in-object -> decorators
-        "@babel/plugin-transform-class-properties", // Must run AFTER TypeScript plugin processes declare fields
+        "@babel/plugin-transform-class-properties", // Must run AFTER TypeScript preset processes declare fields
         "@babel/plugin-transform-private-methods", // required for TypeScript private methods
         "@babel/plugin-transform-private-property-in-object", // required for TypeScript private fields
         
