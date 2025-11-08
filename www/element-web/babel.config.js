@@ -33,13 +33,12 @@ module.exports = {
         // CRITICAL: Add TypeScript plugin explicitly BEFORE class-properties to ensure declare fields are transformed
         // Even though TypeScript preset runs first (because it's last in presets array), we need to ensure
         // that the TypeScript plugin specifically removes declare fields before class-properties plugin runs
+        // NOTE: isTSX and allExtensions are NOT valid options for the plugin - they're only for the preset
         [
             "@babel/plugin-transform-typescript",
             {
                 allowDeclareFields: true,
                 allowNamespaces: true,
-                isTSX: true, // ✅ TSX parsing için kritik
-                allExtensions: true, // ✅ isTSX:true kullanıldığında zorunlu
             },
         ],
         
