@@ -26,8 +26,10 @@ fi
 
 # Server name güncelle
 if [ ! -z "$SYNAPSE_SERVER_NAME" ]; then
-    sed -i "s|server_name: \"matrix-synapse-production.up.railway.app\"|server_name: \"$SYNAPSE_SERVER_NAME\"|g" $DATA_DIR/homeserver.yaml
-    sed -i "s|https://matrix-synapse-production.up.railway.app/|https://$SYNAPSE_SERVER_NAME/|g" $DATA_DIR/homeserver.yaml
+    # Herhangi bir server_name değerini replace et
+    sed -i "s|server_name: \".*\"|server_name: \"$SYNAPSE_SERVER_NAME\"|g" $DATA_DIR/homeserver.yaml
+    # Herhangi bir public_baseurl değerini replace et
+    sed -i "s|public_baseurl: \"https://.*/\"|public_baseurl: \"https://$SYNAPSE_SERVER_NAME/\"|g" $DATA_DIR/homeserver.yaml
 fi
 
 # Web client location güncelle
