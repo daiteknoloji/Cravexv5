@@ -135,7 +135,7 @@ user_directory:
   search_all_users: true
 
 ## TURN/STUN Server for Video Calls ##
-e para kazanabılır mnıyım bu tarz uygulamalıarı gıtden ıdnırıp duzenleyıps atabılır mıyız ? :D # Metered.ca TURN Server (Öncelikli - kendi credentials'ımızla)
+# Metered.ca TURN Server (Öncelikli - kendi credentials'ımızla)
 # NOT: Synapse turn_shared_secret ile username/password oluşturuyor
 # Bu yüzden Metered.ca credentials'ları config.json'da kalacak
 # Synapse sadece TURN server URL'lerini verecek
