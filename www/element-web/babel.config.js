@@ -24,6 +24,7 @@ module.exports = {
             {
                 allowDeclareFields: true,
                 allowNamespaces: true,
+                isTSX: true, // ✅ TSX parsing için kritik - TypeScript private keyword'lerini parse edebilmek için
             },
         ],
     ],
@@ -36,6 +37,7 @@ module.exports = {
             {
                 allowDeclareFields: true,
                 allowNamespaces: true,
+                isTSX: true, // ✅ TSX parsing için kritik
             },
         ],
         
