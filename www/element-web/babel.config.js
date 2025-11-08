@@ -24,8 +24,8 @@ module.exports = {
             {
                 allowDeclareFields: true,
                 allowNamespaces: true,
-                isTSX: true, // ✅ TSX parsing için kritik - sadece .tsx dosyaları için JSX parsing
-                // allExtensions: true kaldırıldı - .ts dosyaları JSX olarak parse edilmemeli
+                // isTSX kaldırıldı - @babel/preset-react otomatik olarak .tsx dosyaları için JSX parsing yapar
+                // isTSX: true tüm .ts dosyalarını JSX olarak parse etmeye çalışıyor, bu da syntax hatalarına yol açıyor
             },
         ],
     ],
