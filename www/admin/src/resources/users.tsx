@@ -36,6 +36,8 @@ import {
   SelectInput,
   BulkDeleteButton,
   DeleteButton,
+  DeleteWithConfirmButton,
+  DeleteWithConfirmButtonProps,
   maxLength,
   regex,
   required,
@@ -100,6 +102,25 @@ const UserBulkActionButtons = () => (
   </>
 );
 
+const UserDeleteButton = (props: DeleteWithConfirmButtonProps) => {
+  const record = useRecordContext();
+  const translate = useTranslate();
+  
+  if (!record) return null;
+
+  return (
+    <DeleteWithConfirmButton
+      {...props}
+      label="resources.users.action.erase"
+      confirmTitle={translate("resources.users.helper.erase", {
+        smart_count: 1,
+      })}
+      mutationMode="pessimistic"
+      redirect={false}
+    />
+  );
+};
+
 export const UserList = (props: ListProps) => (
   <List
     {...props}
@@ -122,11 +143,7 @@ export const UserList = (props: ListProps) => (
       <BooleanField source="locked" />
       <BooleanField source="erased" sortable={false} />
       <DateField source="creation_ts" label="resources.users.fields.creation_ts_ms" showTime options={DATE_FORMAT} />
-      <DeleteButton
-        label="resources.users.action.erase"
-        confirmTitle="resources.users.helper.erase"
-        mutationMode="pessimistic"
-      />
+      <UserDeleteButton />
     </Datagrid>
   </List>
 );
