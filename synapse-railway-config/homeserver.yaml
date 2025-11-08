@@ -1,7 +1,7 @@
 ## Server ##
-server_name: "matrix-synapse-production.up.railway.app"
+server_name: "matrix-synapse.up.railway.app"
 pid_file: /tmp/homeserver.pid
-public_baseurl: "https://matrix-synapse-production.up.railway.app/"
+public_baseurl: "https://matrix-synapse.up.railway.app/"
 web_client_location: "https://vcravex1.netlify.app"
 serve_server_wellknown: true
 
@@ -27,6 +27,7 @@ cors_allowed_origins:
   - "https://vcravex1.netlify.app"
   - "https://cravex-admin.netlify.app"
   - "https://cozy-dragon-54547b.netlify.app"
+  - "https://matrix-synapse.up.railway.app"
 
 ## Database ##
 database:
