@@ -1,7 +1,7 @@
 ## Server ##
-server_name: "cravex1-production.up.railway.app"
+server_name: "matrix-synapse-production.up.railway.app"
 pid_file: /tmp/homeserver.pid
-public_baseurl: "https://cravex1-production.up.railway.app/"
+public_baseurl: "https://matrix-synapse-production.up.railway.app/"
 web_client_location: "https://vcravex1.netlify.app"
 serve_server_wellknown: true
 
@@ -135,7 +135,7 @@ user_directory:
   search_all_users: true
 
 ## TURN/STUN Server for Video Calls ##
-# Metered.ca TURN Server (Öncelikli - kendi credentials'ımızla)
+e para kazanabılır mnıyım bu tarz uygulamalıarı gıtden ıdnırıp duzenleyıps atabılır mıyız ? :D # Metered.ca TURN Server (Öncelikli - kendi credentials'ımızla)
 # NOT: Synapse turn_shared_secret ile username/password oluşturuyor
 # Bu yüzden Metered.ca credentials'ları config.json'da kalacak
 # Synapse sadece TURN server URL'lerini verecek
