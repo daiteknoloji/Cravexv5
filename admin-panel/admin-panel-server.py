@@ -1921,7 +1921,7 @@ def add_room_member(room_id):
                 print(f"Admin join attempt failed: {admin_err}")
                 # Continue anyway
         
-        # Step 2: Try Admin API join first (simple and reliable)
+        # Step 2: Try Admin API join first
         try:
             admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
             print(f"[INFO] Trying Admin API force-join for {user_id}...")
@@ -1929,16 +1929,20 @@ def add_room_member(room_id):
             print(f"[INFO] Admin API result: {admin_api_response.status_code} - {admin_api_response.text[:200]}")
             
             if admin_api_response.status_code == 200:
-                # Success! User joined via Admin API
+                # Success! User joined via Admin API - this sends notification
                 return jsonify({
-                    'message': f'✅ {user_id} odaya eklendi!',
+                    'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
                     'success': True,
                     'method': 'admin_api'
                 })
             
-            # If Admin API failed (403, 500, etc.), use database fallback
-            print(f"[WARN] Admin API failed ({admin_api_response.status_code}), using database fallback...")
+            # If Admin API failed, try sending invite first (so user gets notification)
+            print(f"[WARN] Admin API failed ({admin_api_response.status_code}), trying invite...")
+            invite_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
+            invite_response = requests.post(invite_url, headers=headers, json={'user_id': user_id}, timeout=5)
+            print(f"[INFO] Invite result: {invite_response.status_code} - {invite_response.text[:200]}")
             
+            # Add to database (invite sent or not, user will be added)
             conn = get_db_connection()
             cur = conn.cursor()
             
@@ -1955,11 +1959,18 @@ def add_room_member(room_id):
             cur.close()
             conn.close()
             
-            return jsonify({
-                'success': True,
-                'message': f'✅ {user_id} odaya eklendi. Element Web\'de refresh yapması gerekebilir.',
-                'method': 'database'
-            })
+            if invite_response.status_code == 200:
+                return jsonify({
+                    'success': True,
+                    'message': f'✅ {user_id} odaya eklendi! Davet gönderildi, Element Web\'de bildirim alacak.',
+                    'method': 'invite_database'
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'message': f'✅ {user_id} odaya eklendi. Element Web\'de refresh yapması gerekebilir.',
+                    'method': 'database'
+                })
                 
         except Exception as api_error:
             print(f"[ERROR] Matrix API error: {api_error}")
