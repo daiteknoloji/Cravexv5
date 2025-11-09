@@ -41,6 +41,135 @@ ADMIN_USER_ID = f'@admin:{HOMESERVER_DOMAIN}'
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
+# Media Cache Functions
+def init_media_cache_table():
+    """Media cache tablosunu oluştur"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS media_cache (
+                id SERIAL PRIMARY KEY,
+                media_id VARCHAR(255) NOT NULL UNIQUE,
+                server_name VARCHAR(255) NOT NULL,
+                mxc_url TEXT NOT NULL,
+                media_data BYTEA NOT NULL,
+                content_type VARCHAR(255),
+                file_size BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                access_count INTEGER DEFAULT 0,
+                sender_user_id VARCHAR(255),
+                event_id VARCHAR(255)
+            )
+        """)
+        
+        # Index'leri oluştur
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_media_cache_media_id 
+            ON media_cache(media_id)
+        """)
+        
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_media_cache_server_name 
+            ON media_cache(server_name)
+        """)
+        
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_media_cache_last_accessed 
+            ON media_cache(last_accessed)
+        """)
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("[INFO] Media cache table initialized")
+    except Exception as e:
+        print(f"[ERROR] Failed to create media_cache table: {e}")
+
+def get_media_from_cache(media_id):
+    """Media dosyasını cache'den oku"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            SELECT media_data, content_type, file_size, sender_user_id, event_id
+            FROM media_cache
+            WHERE media_id = %s
+        """, (media_id,))
+        
+        row = cur.fetchone()
+        
+        if row:
+            # Access count ve last_accessed güncelle
+            cur.execute("""
+                UPDATE media_cache
+                SET access_count = access_count + 1,
+                    last_accessed = CURRENT_TIMESTAMP
+                WHERE media_id = %s
+            """, (media_id,))
+            conn.commit()
+            
+            cur.close()
+            conn.close()
+            
+            return {
+                'media_data': row[0],  # BYTEA
+                'content_type': row[1],
+                'file_size': row[2],
+                'sender_user_id': row[3],
+                'event_id': row[4],
+                'cached': True
+            }
+        
+        cur.close()
+        conn.close()
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to get media from cache: {e}")
+        return None
+
+def save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type=None, sender_user_id=None, event_id=None):
+    """Media dosyasını cache'e kaydet (sadece küçük dosyalar için)"""
+    MAX_CACHE_SIZE_MB = 5  # 5MB'dan küçük dosyalar cache'lenir
+    file_size = len(media_data) if isinstance(media_data, bytes) else len(media_data.encode())
+    
+    # Büyük dosyaları cache'leme
+    if file_size > MAX_CACHE_SIZE_MB * 1024 * 1024:
+        print(f"[INFO] Media too large to cache: {media_id} ({file_size / 1024 / 1024:.2f} MB)")
+        return False
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            INSERT INTO media_cache 
+            (media_id, server_name, mxc_url, media_data, content_type, file_size, sender_user_id, event_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (media_id) 
+            DO UPDATE SET
+                media_data = EXCLUDED.media_data,
+                content_type = EXCLUDED.content_type,
+                file_size = EXCLUDED.file_size,
+                last_accessed = CURRENT_TIMESTAMP,
+                access_count = media_cache.access_count + 1
+        """, (media_id, server_name, mxc_url, media_data, content_type, file_size, sender_user_id, event_id))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"[INFO] Media cached: {media_id} ({file_size / 1024:.2f} KB)")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to cache media: {e}")
+        return False
+
+# Initialize media cache table on startup
+init_media_cache_table()
+
 # Login required decorator
 def login_required(f):
     @wraps(f)
@@ -2990,6 +3119,22 @@ def proxy_media_download(server_name, media_id):
         else:
             print(f"[WARN] No token found - trying without authentication")
         
+        # 1. Önce cache'den kontrol et
+        cached_media = get_media_from_cache(media_id)
+        if cached_media:
+            print(f"[INFO] ✅ Media served from cache: {media_id} ({cached_media['file_size'] / 1024:.2f} KB)")
+            return Response(
+                cached_media['media_data'],
+                mimetype=cached_media['content_type'] or 'application/octet-stream',
+                headers={
+                    'Content-Disposition': f'inline; filename="{media_id}"',
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*',
+                    'X-Cache': 'HIT'
+                }
+            )
+        
+        print(f"[INFO] ⏳ Media not in cache, fetching from Matrix: {media_id}")
         print(f"[DEBUG] Request headers: {headers}")
         response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
         print(f"[DEBUG] Response status: {response.status_code}")
