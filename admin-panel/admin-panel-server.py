@@ -2663,6 +2663,23 @@ def change_user_password(user_id):
                 UPDATE users SET password_hash = %s WHERE name = %s
             """, (password_hash, user_id))
             
+            # Verify password hash was updated correctly
+            cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
+            verify_row = cur.fetchone()
+            if verify_row:
+                verify_hash = verify_row[0]
+                print(f"[DEBUG] Verified updated password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
+                print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
+            
+            # CRITICAL: Verify password works by testing with bcrypt.checkpw
+            import bcrypt
+            test_check = bcrypt.checkpw(new_password.encode('utf-8'), password_hash.encode('utf-8'))
+            print(f"[DEBUG] Password verification test (bcrypt.checkpw): {test_check}")
+            if not test_check:
+                print(f"[ERROR] Password hash verification FAILED! This is a critical error!")
+            else:
+                print(f"[INFO] Password hash verification PASSED!")
+            
             conn.commit()
             affected_rows = cur.rowcount
             cur.close()
