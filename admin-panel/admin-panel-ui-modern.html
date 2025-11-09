@@ -2047,6 +2047,10 @@
                 
                 // Apply filters
                 filteredUsers = allUsers.filter(user => {
+                    // Hide deactivated users by default (unless explicitly filtered)
+                    const roleFilter = document.getElementById('filterRole').value;
+                    if (!roleFilter && user.deactivated) return false; // Hide deactivated unless filtering for them
+                    
                     // User ID filter
                     const userIdFilter = document.getElementById('filterUserId').value.toLowerCase();
                     if (userIdFilter && !user.user_id.toLowerCase().includes(userIdFilter)) return false;
@@ -2056,7 +2060,6 @@
                     if (displayNameFilter && !(user.displayname || '').toLowerCase().includes(displayNameFilter)) return false;
                     
                     // Role filter
-                    const roleFilter = document.getElementById('filterRole').value;
                     if (roleFilter === 'admin' && !user.admin) return false;
                     if (roleFilter === 'user' && user.admin) return false;
                     if (roleFilter === 'locked' && !user.locked) return false;

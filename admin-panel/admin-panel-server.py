@@ -1849,13 +1849,7 @@ def delete_user(user_id):
         
         print(f"[INFO] Deleting user: {user_id} (currently deactivated: {user_row[1]})")
         
-        # Deactivate user
-        cur.execute("""
-            UPDATE users SET deactivated = 1 WHERE name = %s
-        """, (user_id,))
-        deactivated_count = cur.rowcount
-        
-        # Delete access tokens (logout all sessions)
+        # Delete access tokens first (logout all sessions)
         cur.execute("""
             DELETE FROM access_tokens WHERE user_id = %s
         """, (user_id,))
@@ -1867,18 +1861,49 @@ def delete_user(user_id):
         """, (user_id,))
         devices_deleted = cur.rowcount
         
+        # Delete room memberships
+        cur.execute("""
+            DELETE FROM room_memberships WHERE user_id = %s
+        """, (user_id,))
+        memberships_deleted = cur.rowcount
+        
+        # Delete user directory entries
+        cur.execute("""
+            DELETE FROM user_directory WHERE user_id = %s
+        """, (user_id,))
+        directory_deleted = cur.rowcount
+        
+        # Delete profiles
+        cur.execute("""
+            DELETE FROM profiles WHERE user_id = %s
+        """, (user_id,))
+        profiles_deleted = cur.rowcount
+        
+        # Deactivate user (set deactivated flag)
+        cur.execute("""
+            UPDATE users SET deactivated = 1 WHERE name = %s
+        """, (user_id,))
+        deactivated_count = cur.rowcount
+        
+        # Actually delete user from users table
+        cur.execute("""
+            DELETE FROM users WHERE name = %s
+        """, (user_id,))
+        user_deleted = cur.rowcount
+        
         conn.commit()
         cur.close()
         conn.close()
         
-        print(f"[INFO] User deleted: {user_id} - deactivated: {deactivated_count}, tokens: {tokens_deleted}, devices: {devices_deleted}")
+        print(f"[INFO] User completely deleted: {user_id} - user: {user_deleted}, tokens: {tokens_deleted}, devices: {devices_deleted}, memberships: {memberships_deleted}")
         
         return jsonify({
             'success': True,
             'message': f'Kullanıcı başarıyla silindi: {user_id}',
-            'deactivated': deactivated_count > 0,
+            'user_deleted': user_deleted > 0,
             'tokens_deleted': tokens_deleted,
-            'devices_deleted': devices_deleted
+            'devices_deleted': devices_deleted,
+            'memberships_deleted': memberships_deleted
         })
         
     except Exception as e:
