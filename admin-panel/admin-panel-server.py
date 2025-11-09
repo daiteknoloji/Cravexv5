@@ -1657,8 +1657,7 @@ def get_users():
                 {shadow_col},
                 {locked_col}
             FROM users u
-            WHERE u.deactivated = 0
-            ORDER BY u.admin DESC, u.name;
+            ORDER BY u.admin DESC, u.deactivated ASC, u.name;
         """
         
         cur.execute(query)
@@ -1803,6 +1802,79 @@ def toggle_user_admin(user_id):
     except Exception as e:
         print(f"[HATA] PUT /api/users/{user_id}/admin - {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<user_id>/deactivate', methods=['PUT'])
+@login_required
+def toggle_user_deactivate(user_id):
+    """Toggle user deactivated status (activate/deactivate)"""
+    try:
+        deactivate = request.json.get('deactivated', False)
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE users SET deactivated = %s WHERE name = %s
+        """, (1 if deactivate else 0, user_id))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Kullanıcı {"pasif yapıldı" if deactivate else "aktif yapıldı"}',
+            'deactivated': bool(deactivate)
+        })
+        
+    except Exception as e:
+        print(f"[HATA] PUT /api/users/{user_id}/deactivate - {str(e)}")
+        return jsonify({'error': str(e), 'success': False}), 500
+
+@app.route('/api/users/<user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    """Delete user (deactivate and mark as erased)"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check if user exists
+        cur.execute("SELECT name FROM users WHERE name = %s", (user_id,))
+        if not cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({'error': 'Kullanıcı bulunamadı', 'success': False}), 404
+        
+        # Deactivate user
+        cur.execute("""
+            UPDATE users SET deactivated = 1 WHERE name = %s
+        """, (user_id,))
+        
+        # Delete access tokens (logout all sessions)
+        cur.execute("""
+            DELETE FROM access_tokens WHERE user_id = %s
+        """, (user_id,))
+        
+        # Delete devices
+        cur.execute("""
+            DELETE FROM devices WHERE user_id = %s
+        """, (user_id,))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Kullanıcı başarıyla silindi: {user_id}'
+        })
+        
+    except Exception as e:
+        print(f"[HATA] DELETE /api/users/{user_id} - {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'success': False}), 500
 
 @app.route('/api/users/<user_id>/password', methods=['PUT'])
 @login_required

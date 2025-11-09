@@ -1066,6 +1066,7 @@
                                         <option value="user">Normal Kullanıcı</option>
                                         <option value="locked">Kilitli</option>
                                         <option value="banned">Yasaklı</option>
+                                        <option value="deactivated">Pasif</option>
                                     </select>
                                 </div>
                             </div>
@@ -2060,6 +2061,7 @@
                     if (roleFilter === 'user' && user.admin) return false;
                     if (roleFilter === 'locked' && !user.locked) return false;
                     if (roleFilter === 'banned' && !user.shadow_banned) return false;
+                    if (roleFilter === 'deactivated' && !user.deactivated) return false;
                     
                     // Min rooms filter
                     const minRooms = parseInt(document.getElementById('filterMinRooms').value) || 0;
@@ -2104,18 +2106,32 @@
                 const adminBadge = user.admin ? '<span class="badge badge-info"><i class="fas fa-crown"></i> Admin</span>' : '<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">Kullanıcı</span>';
                 const lockedBadge = user.locked ? '<span class="badge badge-warning" style="margin-left: 4px;"><i class="fas fa-lock"></i> Kilitli</span>' : '';
                 const bannedBadge = user.shadow_banned ? '<span class="badge badge-danger" style="margin-left: 4px;"><i class="fas fa-ban"></i> Banned</span>' : '';
+                const deactivatedBadge = user.deactivated ? '<span class="badge badge-danger" style="margin-left: 4px;"><i class="fas fa-user-slash"></i> Pasif</span>' : '';
                 
                 html += `
                     <tr>
                         <td onclick="showUserDetails('${user.user_id}')" style="font-family: monospace; color: var(--accent-blue); font-weight: 500; cursor: pointer;">${user.user_id}</td>
                         <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;">${user.displayname || '<em style="color: var(--text-muted);">Yok</em>'}</td>
-                        <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;">${adminBadge}${lockedBadge}${bannedBadge}</td>
+                        <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;">${adminBadge}${lockedBadge}${bannedBadge}${deactivatedBadge}</td>
                         <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;"><span class="badge badge-success">${user.room_count} oda</span></td>
                         <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;"><span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">${user.active_sessions} oturum</span></td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openChangePasswordModal('${user.user_id}')" style="padding: 6px 12px; font-size: 13px;">
-                                <i class="fas fa-key"></i> Şifre Değiştir
-                            </button>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                ${user.deactivated ? 
+                                    `<button class="btn btn-sm btn-success" onclick="event.stopPropagation(); toggleUserDeactivate('${user.user_id}', false)" style="padding: 6px 12px; font-size: 13px;">
+                                        <i class="fas fa-check-circle"></i> Aktif Yap
+                                    </button>` :
+                                    `<button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); toggleUserDeactivate('${user.user_id}', true)" style="padding: 6px 12px; font-size: 13px;">
+                                        <i class="fas fa-ban"></i> Pasif Yap
+                                    </button>`
+                                }
+                                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openChangePasswordModal('${user.user_id}')" style="padding: 6px 12px; font-size: 13px;">
+                                    <i class="fas fa-key"></i> Şifre
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteUser('${user.user_id}')" style="padding: 6px 12px; font-size: 13px;">
+                                    <i class="fas fa-trash"></i> Sil
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -2335,6 +2351,61 @@
                 console.error('Password change error:', error);
                 errorText.textContent = 'Sunucu hatası! Lütfen tekrar deneyin.';
                 errorDiv.style.display = 'block';
+            }
+        }
+        
+        async function toggleUserDeactivate(userId, deactivate) {
+            const action = deactivate ? 'pasif yapmak' : 'aktif yapmak';
+            if (!confirm(`${userId} kullanıcısını ${action} istediğinize emin misiniz?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/users/${encodeURIComponent(userId)}/deactivate`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ deactivated: deactivate })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(result.message || `Kullanıcı ${deactivate ? 'pasif yapıldı' : 'aktif yapıldı'}!`, 'success');
+                    loadUsers(); // Refresh
+                } else {
+                    showToast(result.error || 'İşlem başarısız', 'error');
+                }
+            } catch (error) {
+                showToast('Hata: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteUser(userId) {
+            if (!confirm(`${userId} kullanıcısını SİLMEK istediğinize emin misiniz?\n\nBu işlem geri alınamaz!`)) {
+                return;
+            }
+            
+            if (!confirm('Son bir kez daha onaylıyor musunuz? Kullanıcı kalıcı olarak silinecek!')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(result.message || 'Kullanıcı başarıyla silindi!', 'success');
+                    loadUsers(); // Refresh
+                } else {
+                    showToast(result.error || 'Kullanıcı silinemedi', 'error');
+                }
+            } catch (error) {
+                showToast('Hata: ' + error.message, 'error');
             }
         }
         
