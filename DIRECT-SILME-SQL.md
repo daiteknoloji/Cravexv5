@@ -41,8 +41,31 @@ COMMIT;
 
 ```sql
 -- Dikkat: TRUNCATE geri alınamaz ve AUTO_INCREMENT'i sıfırlar!
+-- ÖNEMLİ: Eğer transaction hatası alırsanız, önce ROLLBACK; yapın
 
+-- Önce transaction'ı temizle (eğer hata varsa)
+ROLLBACK;
+
+-- Sonra tek tek çalıştırın (her biri ayrı transaction)
 TRUNCATE TABLE redactions CASCADE;
+TRUNCATE TABLE event_json CASCADE;
+TRUNCATE TABLE events CASCADE;
+TRUNCATE TABLE room_memberships CASCADE;
+TRUNCATE TABLE rooms CASCADE;
+```
+
+## 2A. TRUNCATE HATASI ALIRSANIZ (Tablo Yoksa veya Constraint Sorunu)
+
+```sql
+-- Önce transaction'ı temizle
+ROLLBACK;
+
+-- Tabloları kontrol et
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' 
+  AND table_name IN ('redactions', 'event_json', 'events', 'room_memberships', 'rooms');
+
+-- Eğer redactions tablosu yoksa, sadece diğerlerini silin:
 TRUNCATE TABLE event_json CASCADE;
 TRUNCATE TABLE events CASCADE;
 TRUNCATE TABLE room_memberships CASCADE;
@@ -95,18 +118,59 @@ VACUUM FULL ANALYZE rooms;
 
 ---
 
-## EN HIZLI YOL (Kopyala-Yapıştır)
+## EN HIZLI YOL (Kopyala-Yapıştır - DELETE ile Güvenli)
 
 ```sql
 BEGIN;
-DELETE FROM redactions;
+
+-- Önce redactions varsa sil (yoksa hata vermez)
+DELETE FROM redactions WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'redactions');
+
+-- Diğer tabloları sil
 DELETE FROM event_json;
 DELETE FROM events;
 DELETE FROM room_memberships;
 DELETE FROM rooms;
+
+-- Kontrol
 SELECT COUNT(*) as kalan_odalar FROM rooms;
 SELECT COUNT(*) as kalan_mesajlar FROM events;
+
+-- Eğer her şey tamam ise:
 COMMIT;
+
+-- Eğer sorun varsa:
+-- ROLLBACK;
+
+-- Temizleme
+VACUUM FULL ANALYZE;
+```
+
+## EN GÜVENLİ YOL (Her Komut Ayrı - Hata Durumunda Devam Eder)
+
+```sql
+-- Her komutu tek tek çalıştırın (transaction olmadan)
+
+-- 1. Redactions (varsa)
+DELETE FROM redactions;
+
+-- 2. Event JSON'ları
+DELETE FROM event_json;
+
+-- 3. Events (mesajlar ve diğer event'ler)
+DELETE FROM events;
+
+-- 4. Oda üyelikleri
+DELETE FROM room_memberships;
+
+-- 5. Odalar
+DELETE FROM rooms;
+
+-- Kontrol
+SELECT COUNT(*) as kalan_odalar FROM rooms;
+SELECT COUNT(*) as kalan_mesajlar FROM events;
+
+-- Temizleme
 VACUUM FULL ANALYZE;
 ```
 
