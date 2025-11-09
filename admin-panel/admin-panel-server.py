@@ -2650,9 +2650,13 @@ def change_user_password(user_id):
             cur = conn.cursor()
             
             # Hash password with bcrypt (12 rounds - same as Synapse)
+            # IMPORTANT: Matrix Synapse expects password_hash as TEXT/VARCHAR, not BYTEA
             salt = bcrypt.gensalt(rounds=12)
-            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), salt).decode('utf-8')
+            password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+            # Convert to string - Matrix Synapse stores as TEXT/VARCHAR
+            password_hash = password_hash_bytes.decode('utf-8')
             print(f"[DEBUG] Password hash for {user_id}: {password_hash[:30]}...")
+            print(f"[DEBUG] Password hash type: {type(password_hash)}, is string: {isinstance(password_hash, str)}")
             
             # Update password in database
             cur.execute("""
@@ -2870,8 +2874,12 @@ def create_user():
             print(f"[INFO] Updating password hash to ensure login works...")
             
             # Always update password hash (user might have been created via Matrix API but password doesn't work)
+            # IMPORTANT: Matrix Synapse expects password_hash as TEXT/VARCHAR, not BYTEA
             salt = bcrypt.gensalt(rounds=12)
-            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+            password_hash_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
+            # Convert to string - Matrix Synapse stores as TEXT/VARCHAR
+            password_hash = password_hash_bytes.decode('utf-8')
+            print(f"[DEBUG] Updated password hash for {user_id}: {password_hash[:30]}...")
             cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
             conn.commit()
             cur.close()
@@ -2885,11 +2893,15 @@ def create_user():
             })
         
         # Hash password (bcrypt with 12 rounds - same as Synapse)
-        # IMPORTANT: Use gensalt(rounds=12) to match Synapse's default
+        # IMPORTANT: Matrix Synapse expects password_hash as TEXT/VARCHAR, not BYTEA
+        # Use gensalt(rounds=12) to match Synapse's default
         salt = bcrypt.gensalt(rounds=12)
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+        password_hash_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
+        # Convert to string - Matrix Synapse stores as TEXT/VARCHAR
+        password_hash = password_hash_bytes.decode('utf-8')
         print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:30]}...")
         print(f"[DEBUG] Password hash length: {len(password_hash)}, starts with: {password_hash[:7]}")
+        print(f"[DEBUG] Password hash type: {type(password_hash)}, is string: {isinstance(password_hash, str)}")
         
         # Insert user (with all required columns)
         # Synapse uses milliseconds for creation_ts
