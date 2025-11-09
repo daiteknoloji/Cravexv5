@@ -1918,15 +1918,26 @@ def add_room_member(room_id):
                 print(f"Admin join attempt failed: {admin_err}")
                 # Continue anyway
         
-        # Step 2: Try Admin API join first
+        # Step 2: Try Admin API join first (this sends notification)
         try:
             admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
+            print(f"[INFO] ===== MEMBER ADD DEBUG START =====")
+            print(f"[INFO] User: {user_id}")
+            print(f"[INFO] Room: {room_id}")
+            print(f"[INFO] Admin token: {admin_token[:20] if admin_token else 'NONE'}...")
+            print(f"[INFO] Synapse URL: {synapse_url}")
+            print(f"[INFO] Admin join URL: {admin_join_url}")
             print(f"[INFO] Trying Admin API force-join for {user_id}...")
-            admin_api_response = requests.post(admin_join_url, headers=headers, json={'user_id': user_id}, timeout=5)
-            print(f"[INFO] Admin API result: {admin_api_response.status_code} - {admin_api_response.text[:200]}")
+            
+            admin_api_response = requests.post(admin_join_url, headers=headers, json={'user_id': user_id}, timeout=10)
+            
+            print(f"[INFO] Admin API status: {admin_api_response.status_code}")
+            print(f"[INFO] Admin API response: {admin_api_response.text[:500]}")
+            print(f"[INFO] Admin API headers: {dict(admin_api_response.headers)}")
             
             if admin_api_response.status_code == 200:
                 # Success! User joined via Admin API - this sends notification
+                print(f"[INFO] ✅ Admin API SUCCESS - User joined, notification sent!")
                 return jsonify({
                     'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
                     'success': True,
@@ -1936,8 +1947,10 @@ def add_room_member(room_id):
             # If Admin API failed, try sending invite first (so user gets notification)
             print(f"[WARN] Admin API failed ({admin_api_response.status_code}), trying invite...")
             invite_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
-            invite_response = requests.post(invite_url, headers=headers, json={'user_id': user_id}, timeout=5)
-            print(f"[INFO] Invite result: {invite_response.status_code} - {invite_response.text[:200]}")
+            print(f"[INFO] Invite URL: {invite_url}")
+            invite_response = requests.post(invite_url, headers=headers, json={'user_id': user_id}, timeout=10)
+            print(f"[INFO] Invite status: {invite_response.status_code}")
+            print(f"[INFO] Invite response: {invite_response.text[:500]}")
             
             # If invite sent successfully, try to auto-join user with their token
             if invite_response.status_code == 200:
