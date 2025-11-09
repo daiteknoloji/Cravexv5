@@ -2326,6 +2326,7 @@ def create_user():
                     # Verify user was created correctly
                     print(f"[INFO] User created via Matrix API. Verifying password...")
                     # Test login to verify password works
+                    login_success = False
                     try:
                         test_login = requests.post(
                             f'{synapse_url}/_matrix/client/v3/login',
@@ -2338,17 +2339,24 @@ def create_user():
                         )
                         if test_login.status_code == 200:
                             print(f"[INFO] Password verification successful!")
+                            login_success = True
                         else:
                             print(f"[WARN] Password verification failed: {test_login.status_code} - {test_login.text[:100]}")
+                            print(f"[WARN] Matrix API created user but password doesn't work. This is a problem!")
                     except Exception as verify_error:
                         print(f"[WARN] Could not verify password: {verify_error}")
                     
-                    return jsonify({
-                        'success': True,
-                        'user_id': user_id,
-                        'message': 'User created successfully via Matrix API!',
-                        'method': 'matrix_api'
-                    })
+                    if not login_success:
+                        print(f"[ERROR] Matrix API created user but password verification failed!")
+                        print(f"[ERROR] Falling back to database method to ensure password works...")
+                        # Don't return, continue to database fallback
+                    else:
+                        return jsonify({
+                            'success': True,
+                            'user_id': user_id,
+                            'message': 'User created successfully via Matrix API!',
+                            'method': 'matrix_api'
+                        })
                 else:
                     print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
                     print(f"[WARN] Error details: {response.text[:200]}")
@@ -2363,11 +2371,33 @@ def create_user():
         cur = conn.cursor()
         
         # Check if user exists
-        cur.execute("SELECT name FROM users WHERE name = %s", (user_id,))
-        if cur.fetchone():
-            cur.close()
-            conn.close()
-            return jsonify({'error': 'User already exists', 'success': False}), 409
+        cur.execute("SELECT name, password_hash FROM users WHERE name = %s", (user_id,))
+        existing_user = cur.fetchone()
+        if existing_user:
+            # User exists - check if password needs to be updated
+            existing_hash = existing_user[1]
+            print(f"[INFO] User {user_id} already exists in database")
+            print(f"[INFO] Existing password hash: {existing_hash[:30] if existing_hash else 'NULL'}...")
+            
+            # If password hash is NULL or empty, update it
+            if not existing_hash:
+                print(f"[INFO] User exists but has no password hash. Updating password...")
+                salt = bcrypt.gensalt(rounds=12)
+                password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+                cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
+                conn.commit()
+                cur.close()
+                conn.close()
+                return jsonify({
+                    'success': True,
+                    'user_id': user_id,
+                    'message': 'User already exists - password hash updated!',
+                    'method': 'database_update'
+                })
+            else:
+                cur.close()
+                conn.close()
+                return jsonify({'error': 'User already exists', 'success': False}), 409
         
         # Hash password (bcrypt with 12 rounds - same as Synapse)
         # IMPORTANT: Use gensalt(rounds=12) to match Synapse's default
