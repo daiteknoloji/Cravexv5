@@ -3171,8 +3171,12 @@ def proxy_media_download(server_name, media_id):
                     )
                 else:
                     print(f"[DEBUG] Matrix Client API v3 failed: {client_response.status_code}")
+                    if hasattr(client_response, 'text'):
+                        print(f"[DEBUG] Client API v3 response text: {client_response.text[:200]}")
             except Exception as e:
                 print(f"[WARN] Matrix Client API v3 error: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Fallback to media API
         print(f"[DEBUG] Request headers: {headers}")
