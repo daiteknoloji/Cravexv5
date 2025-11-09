@@ -108,6 +108,8 @@
         .top-nav-tabs {
             display: flex;
             flex: 1;
+            justify-content: center; /* Tab'ları ortala */
+            align-items: center;
             gap: 4px;
             padding: 8px 12px;
             overflow-x: auto;
@@ -146,25 +148,11 @@
         }
         
         .top-nav-user {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 16px;
-            border-left: 1px solid var(--border-color);
-            flex-shrink: 0;
+            display: none; /* Kullanıcı bilgisi gizlendi */
         }
         
         .top-nav-user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--accent-blue);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 12px;
+            display: none;
         }
         
         .top-nav-user-info {
@@ -172,28 +160,46 @@
         }
         
         .top-nav-user-name {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-primary);
+            display: none;
         }
         
-        .top-nav-logout {
-            width: 32px;
-            height: 32px;
-            border-radius: 6px;
+        /* Logout butonu - En sağ alta */
+        .bottom-logout {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .bottom-logout-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text-secondary);
-            background: transparent;
-            border: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-primary);
+            background: rgba(239, 68, 68, 0.15);
+            border: 2px solid rgba(239, 68, 68, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         
-        .top-nav-logout:hover {
-            background: rgba(239, 68, 68, 0.1);
+        .bottom-logout-btn:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: var(--accent-red);
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+        }
+        
+        .bottom-logout-btn i {
+            font-size: 20px;
             color: var(--accent-red);
+        }
+        
+        .top-nav-logout {
+            display: none; /* Eski logout butonu gizlendi */
         }
         
         /* Sidebar - Removed, replaced with top nav */
@@ -693,6 +699,7 @@
         /* Tablet (768px - 1024px) */
         @media (max-width: 1024px) and (min-width: 769px) {
             .top-nav-tabs {
+                justify-content: center; /* Tablet'te de ortala */
                 padding: 8px 10px;
                 gap: 2px;
             }
@@ -714,6 +721,11 @@
                 grid-template-columns: repeat(2, 1fr);
                 gap: 16px;
             }
+            
+            .bottom-logout {
+                bottom: 18px;
+                right: 18px;
+            }
         }
         
         /* Mobile (max-width: 768px) */
@@ -725,6 +737,7 @@
             
             .top-nav-tabs {
                 flex: 1;
+                justify-content: center; /* Mobilde de ortala */
                 padding: 8px 6px;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
@@ -745,13 +758,18 @@
                 margin-right: 6px;
             }
             
-            .top-nav-user {
-                padding: 8px 10px;
-                flex-shrink: 0;
+            .bottom-logout {
+                bottom: 16px;
+                right: 16px;
             }
             
-            .top-nav-user-info {
-                display: none;
+            .bottom-logout-btn {
+                width: 44px;
+                height: 44px;
+            }
+            
+            .bottom-logout-btn i {
+                font-size: 18px;
             }
             
             .content {
@@ -802,6 +820,7 @@
             }
             
             .top-nav-tabs {
+                justify-content: center; /* Küçük ekranlarda da ortala */
                 padding: 6px 4px;
                 gap: 2px;
             }
@@ -820,14 +839,18 @@
                 font-size: 16px;
             }
             
-            .top-nav-user {
-                padding: 6px 8px;
+            .bottom-logout {
+                bottom: 12px;
+                right: 12px;
             }
             
-            .top-nav-user-avatar {
-                width: 28px;
-                height: 28px;
-                font-size: 11px;
+            .bottom-logout-btn {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .bottom-logout-btn i {
+                font-size: 16px;
             }
             
             .content {
