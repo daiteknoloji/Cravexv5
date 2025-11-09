@@ -3223,7 +3223,39 @@ def proxy_media_download(server_name, media_id):
             if response.status_code == 404 or response.status_code >= 500:
                 print(f"[DEBUG] Primary URL failed with {response.status_code}, trying alternatives...")
                 
-                # Try 0: Matrix Client API v3 (if not tried yet)
+                # Try 0: Matrix Media API v3 (Element Web format - if not tried yet)
+                if sender_token and not media_v3_tried:
+                    media_v3_url = f'{synapse_url}/_matrix/media/v3/download/{server_name}/{media_id}?allow_redirect=true'
+                    print(f"[DEBUG] Trying Matrix Media API v3 (Element Web format): {media_v3_url}")
+                    try:
+                        media_v3_response = requests.get(media_v3_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                        if media_v3_response.status_code == 200:
+                            print(f"[DEBUG] ✅ Matrix Media API v3 worked!")
+                            content_type = media_v3_response.headers.get('Content-Type', 'application/octet-stream')
+                            media_data = media_v3_response.content
+                            file_size = len(media_data)
+                            
+                            mxc_url = f'mxc://{server_name}/{media_id}'
+                            save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type, None, None)
+                            
+                            def generate():
+                                yield media_data
+                            
+                            return Response(
+                                generate(),
+                                mimetype=content_type,
+                                headers={
+                                    'Content-Disposition': f'inline; filename="{media_id}"',
+                                    'Cache-Control': 'public, max-age=3600',
+                                    'Access-Control-Allow-Origin': '*',
+                                    'X-Cache': 'MISS',
+                                    'X-Source': 'Media-API-v3-Fallback'
+                                }
+                            )
+                    except Exception as e:
+                        print(f"[WARN] Media API v3 fallback error: {e}")
+                
+                # Try 1: Matrix Client API v3 (if not tried yet)
                 if sender_token and not client_api_tried:
                     client_api_url = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
                     print(f"[DEBUG] Trying Matrix Client API v3: {client_api_url}")
