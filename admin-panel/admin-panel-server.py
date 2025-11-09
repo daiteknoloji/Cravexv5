@@ -1834,8 +1834,10 @@ def toggle_user_deactivate(user_id):
 @app.route('/api/users/<user_id>', methods=['DELETE'])
 @login_required
 def delete_user(user_id):
-    """Delete user (deactivate and mark as erased)"""
+    """Delete user - First logout via Matrix API, then delete from database"""
     try:
+        import requests
+        
         conn = get_db_connection()
         cur = conn.cursor()
         
@@ -1849,7 +1851,73 @@ def delete_user(user_id):
         
         print(f"[INFO] Deleting user: {user_id} (currently deactivated: {user_row[1]})")
         
-        # Delete access tokens first (logout all sessions)
+        # STEP 1: First, logout user via Matrix Admin API (this will immediately logout active sessions)
+        matrix_api_success = False
+        try:
+            # Get admin token
+            cur.execute(
+                "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                (ADMIN_USER_ID,)
+            )
+            token_row = cur.fetchone()
+            admin_token = token_row[0] if token_row else None
+            
+            # If no token, try auto-login
+            if not admin_token:
+                admin_username = os.getenv('ADMIN_USERNAME', 'admin')
+                admin_password = os.getenv('ADMIN_PASSWORD')
+                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+                
+                if admin_password:
+                    try:
+                        login_response = requests.post(
+                            f'{synapse_url}/_matrix/client/v3/login',
+                            json={
+                                'type': 'm.login.password',
+                                'identifier': {'type': 'm.id.user', 'user': admin_username},
+                                'password': admin_password
+                            },
+                            timeout=10
+                        )
+                        
+                        if login_response.status_code == 200:
+                            admin_token = login_response.json().get('access_token')
+                            print(f"[INFO] Auto-login successful for user deletion")
+                    except Exception as login_error:
+                        print(f"[WARN] Auto-login failed: {login_error}")
+            
+            # Use Matrix Admin API to deactivate (this logs out user immediately)
+            if admin_token:
+                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+                headers = {
+                    'Authorization': f'Bearer {admin_token}',
+                    'Content-Type': 'application/json'
+                }
+                
+                # Deactivate via Synapse Admin API (this will logout all sessions)
+                api_url = f'{synapse_url}/_synapse/admin/v1/deactivate/{user_id}'
+                try:
+                    response = requests.post(
+                        api_url, 
+                        headers=headers, 
+                        json={'erase': False},  # Don't erase, just deactivate and logout
+                        timeout=5
+                    )
+                    
+                    if response.status_code == 200:
+                        print(f"[INFO] User deactivated via Matrix API (logged out): {user_id}")
+                        matrix_api_success = True
+                    else:
+                        print(f"[WARN] Matrix API deactivate failed: {response.status_code} - {response.text[:200]}")
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                    print(f"[WARN] Matrix API timeout/connection error: {e}")
+                except Exception as api_error:
+                    print(f"[WARN] Matrix API error: {api_error}")
+        except Exception as matrix_error:
+            print(f"[WARN] Matrix API setup error: {matrix_error}")
+        
+        # STEP 2: Delete from database (even if Matrix API failed, we still delete from DB)
+        # Delete access tokens (logout all sessions from DB)
         cur.execute("""
             DELETE FROM access_tokens WHERE user_id = %s
         """, (user_id,))
@@ -1879,12 +1947,6 @@ def delete_user(user_id):
         """, (user_id,))
         profiles_deleted = cur.rowcount
         
-        # Deactivate user (set deactivated flag)
-        cur.execute("""
-            UPDATE users SET deactivated = 1 WHERE name = %s
-        """, (user_id,))
-        deactivated_count = cur.rowcount
-        
         # Actually delete user from users table
         cur.execute("""
             DELETE FROM users WHERE name = %s
@@ -1895,15 +1957,22 @@ def delete_user(user_id):
         cur.close()
         conn.close()
         
-        print(f"[INFO] User completely deleted: {user_id} - user: {user_deleted}, tokens: {tokens_deleted}, devices: {devices_deleted}, memberships: {memberships_deleted}")
+        print(f"[INFO] User completely deleted: {user_id} - user: {user_deleted}, tokens: {tokens_deleted}, devices: {devices_deleted}, memberships: {memberships_deleted}, matrix_api: {matrix_api_success}")
+        
+        msg = f'Kullanıcı başarıyla silindi: {user_id}'
+        if matrix_api_success:
+            msg += ' - Aktif oturumlar kapatıldı (Matrix API)'
+        else:
+            msg += ' - Veritabanından silindi (Matrix API kullanılamadı)'
         
         return jsonify({
             'success': True,
-            'message': f'Kullanıcı başarıyla silindi: {user_id}',
+            'message': msg,
             'user_deleted': user_deleted > 0,
             'tokens_deleted': tokens_deleted,
             'devices_deleted': devices_deleted,
-            'memberships_deleted': memberships_deleted
+            'memberships_deleted': memberships_deleted,
+            'matrix_api_logout': matrix_api_success
         })
         
     except Exception as e:
