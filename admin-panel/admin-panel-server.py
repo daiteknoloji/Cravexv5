@@ -7,13 +7,14 @@ URL: http://localhost:9000
 Login: admin / admin123
 """
 
-from flask import Flask, render_template_string, jsonify, request, send_file, session, redirect, url_for
+from flask import Flask, render_template_string, jsonify, request, send_file, session, redirect, url_for, Response
 import psycopg2
 from datetime import datetime
 import json
 import csv
 import io
 from functools import wraps
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'cravex-admin-secret-key-2024'
