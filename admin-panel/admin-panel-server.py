@@ -2672,13 +2672,33 @@ def change_user_password(user_id):
                 print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
             
             # CRITICAL: Verify password works by testing with bcrypt.checkpw
+            # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
             import bcrypt
-            test_check = bcrypt.checkpw(new_password.encode('utf-8'), password_hash.encode('utf-8'))
-            print(f"[DEBUG] Password verification test (bcrypt.checkpw): {test_check}")
-            if not test_check:
-                print(f"[ERROR] Password hash verification FAILED! This is a critical error!")
-            else:
-                print(f"[INFO] Password hash verification PASSED!")
+            try:
+                # Get the actual hash from DB to verify
+                cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
+                db_hash_row = cur.fetchone()
+                if db_hash_row and db_hash_row[0]:
+                    db_hash = db_hash_row[0]
+                    # Matrix Synapse stores password_hash as TEXT, so it's already a string
+                    # bcrypt.checkpw needs bytes, so encode the string
+                    if isinstance(db_hash, str):
+                        test_check = bcrypt.checkpw(new_password.encode('utf-8'), db_hash.encode('utf-8'))
+                    else:
+                        # If it's already bytes (shouldn't happen but just in case)
+                        test_check = bcrypt.checkpw(new_password.encode('utf-8'), db_hash)
+                    print(f"[DEBUG] Password verification test (bcrypt.checkpw) with DB hash: {test_check}")
+                    if not test_check:
+                        print(f"[ERROR] Password hash verification FAILED! Password does not match hash!")
+                        print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
+                    else:
+                        print(f"[INFO] Password hash verification PASSED! Login should work!")
+                else:
+                    print(f"[WARN] Could not retrieve password hash from DB for verification")
+            except Exception as verify_error:
+                print(f"[WARN] Password verification error: {verify_error}")
+                import traceback
+                traceback.print_exc()
             
             conn.commit()
             affected_rows = cur.rowcount
@@ -2908,13 +2928,33 @@ def create_user():
                 print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
             
             # CRITICAL: Verify password works by testing with bcrypt.checkpw
+            # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
             import bcrypt
-            test_check = bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
-            print(f"[DEBUG] Password verification test (bcrypt.checkpw): {test_check}")
-            if not test_check:
-                print(f"[ERROR] Password hash verification FAILED! This is a critical error!")
-            else:
-                print(f"[INFO] Password hash verification PASSED!")
+            try:
+                # Get the actual hash from DB to verify
+                cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
+                db_hash_row = cur.fetchone()
+                if db_hash_row and db_hash_row[0]:
+                    db_hash = db_hash_row[0]
+                    # Matrix Synapse stores password_hash as TEXT, so it's already a string
+                    # bcrypt.checkpw needs bytes, so encode the string
+                    if isinstance(db_hash, str):
+                        test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash.encode('utf-8'))
+                    else:
+                        # If it's already bytes (shouldn't happen but just in case)
+                        test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash)
+                    print(f"[DEBUG] Password verification test (bcrypt.checkpw) with DB hash: {test_check}")
+                    if not test_check:
+                        print(f"[ERROR] Password hash verification FAILED! Password does not match hash!")
+                        print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
+                    else:
+                        print(f"[INFO] Password hash verification PASSED! Login should work!")
+                else:
+                    print(f"[WARN] Could not retrieve password hash from DB for verification")
+            except Exception as verify_error:
+                print(f"[WARN] Password verification error: {verify_error}")
+                import traceback
+                traceback.print_exc()
             
             conn.commit()
             cur.close()
@@ -3016,13 +3056,33 @@ def create_user():
         """, (user_id, search_vector))
         
         # CRITICAL: Verify password works by testing with bcrypt.checkpw
+        # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
         import bcrypt
-        test_check = bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
-        print(f"[DEBUG] Password verification test (bcrypt.checkpw): {test_check}")
-        if not test_check:
-            print(f"[ERROR] Password hash verification FAILED! This is a critical error!")
-        else:
-            print(f"[INFO] Password hash verification PASSED!")
+        try:
+            # Get the actual hash from DB to verify
+            cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
+            db_hash_row = cur.fetchone()
+            if db_hash_row and db_hash_row[0]:
+                db_hash = db_hash_row[0]
+                # Matrix Synapse stores password_hash as TEXT, so it's already a string
+                # bcrypt.checkpw needs bytes, so encode the string
+                if isinstance(db_hash, str):
+                    test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash.encode('utf-8'))
+                else:
+                    # If it's already bytes (shouldn't happen but just in case)
+                    test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash)
+                print(f"[DEBUG] Password verification test (bcrypt.checkpw) with DB hash: {test_check}")
+                if not test_check:
+                    print(f"[ERROR] Password hash verification FAILED! Password '{password}' does not match hash!")
+                    print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
+                else:
+                    print(f"[INFO] Password hash verification PASSED! Login should work!")
+            else:
+                print(f"[WARN] Could not retrieve password hash from DB for verification")
+        except Exception as verify_error:
+            print(f"[WARN] Password verification error: {verify_error}")
+            import traceback
+            traceback.print_exc()
         
         conn.commit()
         cur.close()
