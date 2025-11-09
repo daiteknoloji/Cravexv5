@@ -1978,6 +1978,8 @@ def toggle_user_deactivate(user_id):
         
         if deactivate:
             msg = f'Kullanıcı pasif yapıldı - Tüm oturumlar kapatıldı'
+            if new_password:
+                msg += f' - Yeni şifre belirlendi (aktif edildiğinde bu şifre ile login olabilir)'
             if not matrix_api_success:
                 msg += ' (Sadece veritabanı güncellendi - Matrix API kullanılamadı)'
             return jsonify({
