@@ -2,8 +2,8 @@
 
 $username = "admin"
 $password = "Admin@2024!Guclu"
-$synapseUrl = "https://cravex1-production.up.railway.app"
-$sharedSecret = "SuperGizliKayit2024!XyZ123aBc"
+$synapseUrl = "https://matrix-synapse.up.railway.app"
+$sharedSecret = "CHANGE_THIS_TO_RANDOM_STRING"
 
 Write-Host ""
 Write-Host "Creating ADMIN user on Railway Synapse..." -ForegroundColor Cyan
@@ -56,13 +56,13 @@ try {
     Write-Host "LOGIN CREDENTIALS:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Element Web (Chat):" -ForegroundColor Yellow
-    Write-Host "  URL: https://vcravex1.netlify.app"
+    Write-Host "  URL: https://cozy-dragon-54547b.netlify.app/#/login"
     Write-Host "  Username: admin"
     Write-Host "  Password: $password"
     Write-Host ""
     Write-Host "  Synapse Admin (User Management):" -ForegroundColor Yellow
     Write-Host "  URL: https://cravex-admin.netlify.app"
-    Write-Host "  Homeserver: https://cravex1-production.up.railway.app"
+    Write-Host "  Homeserver: https://matrix-synapse.up.railway.app"
     Write-Host "  Username: admin"
     Write-Host "  Password: $password"
     Write-Host ""

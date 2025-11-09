@@ -1410,6 +1410,41 @@
         </div>
     </div>
     
+    <!-- Deactivate User Modal (with password) -->
+    <div class="modal-overlay" id="deactivateModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Kullanıcıyı Pasif Yap</h2>
+                <button class="modal-close" onclick="closeDeactivateModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Kullanıcı:</label>
+                    <div class="form-input" id="deactivateUserId" style="background: rgba(255,255,255,0.03); cursor: not-allowed;" readonly></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Yeni Şifre Belirle:</label>
+                    <input type="password" class="form-input" id="deactivatePassword" placeholder="Pasif yapıldıktan sonra bu şifre ile aktif edilebilir" required>
+                    <small style="color: var(--text-muted); font-size: 12px; margin-top: 4px; display: block;">
+                        Kullanıcı pasif yapıldıktan sonra aktif edildiğinde bu şifre ile login olabilecek.
+                    </small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Yeni Şifre (Tekrar):</label>
+                    <input type="password" class="form-input" id="deactivatePasswordConfirm" placeholder="Şifrenizi tekrar girin" required>
+                </div>
+                <div id="deactivateError" style="color: var(--danger); font-size: 14px; margin-bottom: 12px; display: none;">
+                    <i class="fas fa-exclamation-triangle"></i> <span id="deactivateErrorText"></span>
+                </div>
+                <button class="btn btn-warning" onclick="submitDeactivate()" style="width: 100%;">
+                    <i class="fas fa-ban"></i> Pasif Yap ve Şifreyi Değiştir
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Toast Notification -->
     <div class="toast" id="toast">
         <i class="toast-icon fas fa-check-circle"></i>
@@ -2121,7 +2156,7 @@
                                     `<button class="btn btn-sm btn-success" onclick="event.stopPropagation(); toggleUserDeactivate('${user.user_id}', false)" style="padding: 6px 12px; font-size: 13px;">
                                         <i class="fas fa-check-circle"></i> Aktif Yap
                                     </button>` :
-                                    `<button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); toggleUserDeactivate('${user.user_id}', true)" style="padding: 6px 12px; font-size: 13px;">
+                                    `<button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); openDeactivateModal('${user.user_id}')" style="padding: 6px 12px; font-size: 13px;">
                                         <i class="fas fa-ban"></i> Pasif Yap
                                     </button>`
                                 }
@@ -2354,9 +2389,80 @@
             }
         }
         
+        // Deactivate Modal Functions
+        function openDeactivateModal(userId) {
+            document.getElementById('deactivateUserId').textContent = userId;
+            document.getElementById('deactivatePassword').value = '';
+            document.getElementById('deactivatePasswordConfirm').value = '';
+            document.getElementById('deactivateError').style.display = 'none';
+            document.getElementById('deactivateModal').classList.add('show');
+        }
+        
+        function closeDeactivateModal() {
+            document.getElementById('deactivateModal').classList.remove('show');
+        }
+        
+        async function submitDeactivate() {
+            const userId = document.getElementById('deactivateUserId').textContent;
+            const newPassword = document.getElementById('deactivatePassword').value;
+            const confirmPassword = document.getElementById('deactivatePasswordConfirm').value;
+            const errorDiv = document.getElementById('deactivateError');
+            const errorText = document.getElementById('deactivateErrorText');
+            
+            // Validation
+            if (!newPassword || !confirmPassword) {
+                errorText.textContent = 'Lütfen şifre girin!';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (newPassword.length < 8) {
+                errorText.textContent = 'Şifre en az 8 karakter olmalıdır!';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                errorText.textContent = 'Şifreler eşleşmiyor!';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Hide error
+            errorDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/users/${encodeURIComponent(userId)}/deactivate`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        deactivated: true,
+                        new_password: newPassword  // Şifre değiştir
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(result.message || 'Kullanıcı pasif yapıldı ve şifre değiştirildi!', 'success');
+                    closeDeactivateModal();
+                    loadUsers(); // Refresh
+                } else {
+                    errorText.textContent = result.error || 'İşlem başarısız!';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Deactivate error:', error);
+                errorText.textContent = 'Sunucu hatası! Lütfen tekrar deneyin.';
+                errorDiv.style.display = 'block';
+            }
+        }
+        
         async function toggleUserDeactivate(userId, deactivate) {
-            const action = deactivate ? 'pasif yapmak' : 'aktif yapmak';
-            if (!confirm(`${userId} kullanıcısını ${action} istediğinize emin misiniz?`)) {
+            // This is only for activating (deactivate = false)
+            if (!confirm(`${userId} kullanıcısını aktif yapmak istediğinize emin misiniz?`)) {
                 return;
             }
             
@@ -2366,13 +2472,13 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ deactivated: deactivate })
+                    body: JSON.stringify({ deactivated: false })
                 });
                 
                 const result = await response.json();
                 
                 if (result.success) {
-                    showToast(result.message || `Kullanıcı ${deactivate ? 'pasif yapıldı' : 'aktif yapıldı'}!`, 'success');
+                    showToast(result.message || 'Kullanıcı aktif yapıldı!', 'success');
                     loadUsers(); // Refresh
                 } else {
                     showToast(result.error || 'İşlem başarısız', 'error');

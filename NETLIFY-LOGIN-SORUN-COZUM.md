@@ -64,3 +64,4 @@ Bu sayede CORS sorunları da çözülmüş olmalı.
 
 Sorun çözüldü! Sadece Netlify'da yeni bir deploy yapmanız gerekiyor.
 
+
