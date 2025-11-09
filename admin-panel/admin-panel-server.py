@@ -3057,10 +3057,10 @@ def proxy_media_download(server_name, media_id):
                 SELECT e.sender 
                 FROM events e
                 JOIN event_json ej ON e.event_id = ej.event_id
-                WHERE jsonb_typeof(ej.json) = 'object' 
+                WHERE jsonb_typeof(ej.json::jsonb) = 'object' 
                 AND (
-                    ej.json->'content'->>'url' LIKE %s 
-                    OR ej.json->'content'->'info'->>'thumbnail_url' LIKE %s
+                    (ej.json::jsonb)->'content'->>'url' LIKE %s 
+                    OR (ej.json::jsonb)->'content'->'info'->>'thumbnail_url' LIKE %s
                 )
                 ORDER BY e.stream_ordering DESC 
                 LIMIT 1
@@ -3138,6 +3138,7 @@ def proxy_media_download(server_name, media_id):
         
         # Try Matrix Client API v3 endpoint first (more reliable)
         client_api_url = None
+        client_api_tried = False
         if sender_token:
             # Matrix Client API v3 endpoint (requires auth)
             client_api_url = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
@@ -3219,7 +3220,7 @@ def proxy_media_download(server_name, media_id):
                 print(f"[DEBUG] Primary URL failed with {response.status_code}, trying alternatives...")
                 
                 # Try 0: Matrix Client API v3 (if not tried yet)
-                if sender_token and not client_api_url:
+                if sender_token and not client_api_tried:
                     client_api_url = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
                     print(f"[DEBUG] Trying Matrix Client API v3: {client_api_url}")
                     try:
@@ -3457,10 +3458,10 @@ def proxy_media_thumbnail(server_name, media_id):
                 SELECT e.sender 
                 FROM events e
                 JOIN event_json ej ON e.event_id = ej.event_id
-                WHERE jsonb_typeof(ej.json) = 'object' 
+                WHERE jsonb_typeof(ej.json::jsonb) = 'object' 
                 AND (
-                    ej.json->'content'->>'url' LIKE %s 
-                    OR ej.json->'content'->'info'->>'thumbnail_url' LIKE %s
+                    (ej.json::jsonb)->'content'->>'url' LIKE %s 
+                    OR (ej.json::jsonb)->'content'->'info'->>'thumbnail_url' LIKE %s
                 )
                 ORDER BY e.stream_ordering DESC 
                 LIMIT 1
