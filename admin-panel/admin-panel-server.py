@@ -1841,17 +1841,14 @@ def add_room_member(room_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Check if already member
+        # Check if already member (but don't exit early - try to send invite anyway for notification)
         cur.execute(
             "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id = %s AND membership = 'join'",
             (room_id, user_id)
         )
         exists = cur.fetchone()[0]
         
-        if exists > 0:
-            cur.close()
-            conn.close()
-            return jsonify({'message': 'User already in room', 'success': True})
+        # Note: We'll still try to send invite even if user is in room, to ensure notification
         
         # Get admin token for Matrix API call
         cur.execute(
@@ -2017,7 +2014,21 @@ def add_room_member(room_id):
                     'method': 'invite_database'
                 })
             
-            # Invite failed or not sent - add to database anyway
+            # Invite failed or not sent - check if user already in room
+            invite_error_text = invite_response.text.lower() if invite_response.status_code != 200 else ""
+            is_already_in_room = (
+                invite_response.status_code == 400 and 
+                ('already' in invite_error_text or 'joined' in invite_error_text or 'member' in invite_error_text)
+            ) or exists > 0
+            
+            if is_already_in_room:
+                return jsonify({
+                    'success': True,
+                    'message': f'✅ {user_id} zaten odada!',
+                    'method': 'already_member'
+                })
+            
+            # Invite failed but user not in room - add to database anyway
             conn = get_db_connection()
             cur = conn.cursor()
             import time
