@@ -1942,6 +1942,40 @@ def add_room_member(room_id):
             invite_response = requests.post(invite_url, headers=headers, json={'user_id': user_id}, timeout=5)
             print(f"[INFO] Invite result: {invite_response.status_code} - {invite_response.text[:200]}")
             
+            # If invite sent successfully, try to auto-join user with their token
+            if invite_response.status_code == 200:
+                print(f"[INFO] Invite sent, trying to auto-join user with their token...")
+                join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                
+                # Get user's access token to join as them (auto-accept invite)
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                    (user_id,)
+                )
+                user_token_row = cur.fetchone()
+                user_token = user_token_row[0] if user_token_row else None
+                cur.close()
+                conn.close()
+                
+                if user_token:
+                    # Join as the user (auto-accept invite, they will get notification)
+                    user_headers = {
+                        'Authorization': f'Bearer {user_token}',
+                        'Content-Type': 'application/json'
+                    }
+                    print(f"[INFO] Joining as user via Client API v3...")
+                    user_join_response = requests.post(join_url, headers=user_headers, json={}, timeout=5)
+                    print(f"[INFO] User join result: {user_join_response.status_code} - {user_join_response.text[:200]}")
+                    
+                    if user_join_response.status_code == 200:
+                        return jsonify({
+                            'success': True,
+                            'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
+                            'method': 'invite_autojoin'
+                        })
+            
             # Add to database (invite sent or not, user will be added)
             conn = get_db_connection()
             cur = conn.cursor()
