@@ -2074,8 +2074,13 @@ def change_user_password(user_id):
             conn = get_db_connection()
             cur = conn.cursor()
             
-            # Hash password with bcrypt
-            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            # Hash password using bcrypt (Matrix Synapse format)
+            import bcrypt
+            salt = bcrypt.gensalt(rounds=12)
+            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+            # Ensure it's stored as string
+            if isinstance(password_hash, bytes):
+                password_hash = password_hash.decode('utf-8')
             
             # Update password in database
             cur.execute("""
@@ -2222,9 +2227,15 @@ def create_user():
             conn.close()
             return jsonify({'error': 'User already exists', 'success': False}), 409
         
-        # Hash password (bcrypt with 12 rounds - same as Synapse)
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
-        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:20]}...")
+        # Hash password using bcrypt (Matrix Synapse format)
+        # Matrix Synapse uses bcrypt with $2b$ prefix
+        import bcrypt
+        salt = bcrypt.gensalt(rounds=12)
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), salt)
+        # Ensure it's stored as string (Matrix Synapse expects this)
+        if isinstance(password_hash, bytes):
+            password_hash = password_hash.decode('utf-8')
+        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:30]}...")
         
         # Insert user (with all required columns)
         creation_ts = int(time.time())  # Synapse uses SECONDS, not milliseconds
