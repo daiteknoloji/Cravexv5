@@ -2936,11 +2936,11 @@ def proxy_media_download(server_name, media_id):
             'User-Agent': 'Cravex-Admin-Panel/1.0',
             'Accept': '*/*'
         }
-        if admin_token:
-            headers['Authorization'] = f'Bearer {admin_token}'
-            print(f"[DEBUG] Using admin token for authentication: {admin_token[:20]}...")
+        if sender_token:
+            headers['Authorization'] = f'Bearer {sender_token}'
+            print(f"[DEBUG] Using sender token for authentication: {sender_token[:20]}...")
         else:
-            print(f"[WARN] No admin token found - trying without authentication")
+            print(f"[WARN] No token found - trying without authentication")
         
         print(f"[DEBUG] Request headers: {headers}")
         response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
@@ -3028,7 +3028,7 @@ def proxy_media_download(server_name, media_id):
                     print(f"[DEBUG] Response: {alt_response2.text[:200]}")
                 
                 # Try 3: Matrix Client API endpoint (v3) - requires authentication
-                if admin_token:
+                if sender_token:
                     alt_url3 = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
                     print(f"[DEBUG] Trying alternative URL 3 (client v3 with auth): {alt_url3}")
                     alt_response3 = requests.get(alt_url3, stream=True, timeout=30, allow_redirects=True, headers=headers)
@@ -3053,7 +3053,7 @@ def proxy_media_download(server_name, media_id):
                         print(f"[DEBUG] Response: {alt_response3.text[:200]}")
                 
                 # Try 4: Matrix Client API endpoint without server_name (v3)
-                if admin_token:
+                if sender_token:
                     alt_url4 = f'{synapse_url}/_matrix/client/v3/download/{media_id}'
                     print(f"[DEBUG] Trying alternative URL 4 (client v3, no server_name): {alt_url4}")
                     alt_response4 = requests.get(alt_url4, stream=True, timeout=30, allow_redirects=True, headers=headers)
