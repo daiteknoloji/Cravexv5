@@ -339,7 +339,7 @@ ORDER BY member_count DESC;
 
 ## ÖNEMLİ: PostgreSQL Tip Uyumluluğu
 
-- `is_public` kolonu `boolean` tipindedir: `true` = public, `false` = private
+- `is_public` kolonu `boolean` tipindedir: `true` = public, `false` = privateO
 - `room_version` kolonu `text` veya `integer` tipinde olabilir
 - `origin_server_ts` değerleri milisaniye cinsinden olabilir, formatlamak için `TO_TIMESTAMP(ts / 1000)` kullanın
 
