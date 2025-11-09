@@ -2838,10 +2838,29 @@ def proxy_media_download(server_name, media_id):
         print(f"[DEBUG] Proxying media download: {media_url}")
         print(f"[DEBUG] Server name: {server_name}, Media ID: {media_id}")
         
+        # Try to get admin token for authentication
+        admin_token = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                (ADMIN_USER_ID,)
+            )
+            token_row = cur.fetchone()
+            admin_token = token_row[0] if token_row else None
+            cur.close()
+            conn.close()
+        except Exception as token_error:
+            print(f"[WARN] Could not get admin token: {token_error}")
+        
         # Forward request to Matrix Synapse with headers
         headers = {
             'User-Agent': 'Cravex-Admin-Panel/1.0'
         }
+        if admin_token:
+            headers['Authorization'] = f'Bearer {admin_token}'
+            print(f"[DEBUG] Using admin token for authentication")
         
         response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
         
@@ -2931,10 +2950,29 @@ def proxy_media_thumbnail(server_name, media_id):
         print(f"[DEBUG] Proxying thumbnail: {thumbnail_url}")
         print(f"[DEBUG] Server name: {server_name}, Media ID: {media_id}")
         
+        # Try to get admin token for authentication
+        admin_token = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                (ADMIN_USER_ID,)
+            )
+            token_row = cur.fetchone()
+            admin_token = token_row[0] if token_row else None
+            cur.close()
+            conn.close()
+        except Exception as token_error:
+            print(f"[WARN] Could not get admin token: {token_error}")
+        
         # Forward request to Matrix Synapse with headers
         headers = {
             'User-Agent': 'Cravex-Admin-Panel/1.0'
         }
+        if admin_token:
+            headers['Authorization'] = f'Bearer {admin_token}'
+            print(f"[DEBUG] Using admin token for authentication")
         
         response = requests.get(thumbnail_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
         
