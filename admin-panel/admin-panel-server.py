@@ -2923,16 +2923,17 @@ def proxy_media_download(server_name, media_id):
             cur = conn.cursor()
             
             # Find the event that contains this media_id
-            # Search in event_json content for the media_id
+            # Search in event_json table (JSON data is stored separately in Matrix Synapse)
             cur.execute("""
-                SELECT sender 
-                FROM events 
-                WHERE jsonb_typeof(event_json) = 'object' 
+                SELECT e.sender 
+                FROM events e
+                JOIN event_json ej ON e.event_id = ej.event_id
+                WHERE jsonb_typeof(ej.json) = 'object' 
                 AND (
-                    event_json->'content'->>'url' LIKE %s 
-                    OR event_json->'content'->'info'->>'thumbnail_url' LIKE %s
+                    ej.json->'content'->>'url' LIKE %s 
+                    OR ej.json->'content'->'info'->>'thumbnail_url' LIKE %s
                 )
-                ORDER BY stream_ordering DESC 
+                ORDER BY e.stream_ordering DESC 
                 LIMIT 1
             """, (f'%{media_id}%', f'%{media_id}%'))
             
@@ -3228,15 +3229,17 @@ def proxy_media_thumbnail(server_name, media_id):
             cur = conn.cursor()
             
             # Find the event that contains this media_id
+            # Search in event_json table (JSON data is stored separately in Matrix Synapse)
             cur.execute("""
-                SELECT sender 
-                FROM events 
-                WHERE jsonb_typeof(event_json) = 'object' 
+                SELECT e.sender 
+                FROM events e
+                JOIN event_json ej ON e.event_id = ej.event_id
+                WHERE jsonb_typeof(ej.json) = 'object' 
                 AND (
-                    event_json->'content'->>'url' LIKE %s 
-                    OR event_json->'content'->'info'->>'thumbnail_url' LIKE %s
+                    ej.json->'content'->>'url' LIKE %s 
+                    OR ej.json->'content'->'info'->>'thumbnail_url' LIKE %s
                 )
-                ORDER BY stream_ordering DESC 
+                ORDER BY e.stream_ordering DESC 
                 LIMIT 1
             """, (f'%{media_id}%', f'%{media_id}%'))
             
