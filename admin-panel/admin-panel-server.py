@@ -2836,9 +2836,14 @@ def proxy_media_download(server_name, media_id):
         media_url = f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
         
         print(f"[DEBUG] Proxying media download: {media_url}")
+        print(f"[DEBUG] Server name: {server_name}, Media ID: {media_id}")
         
-        # Forward request to Matrix Synapse
-        response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True)
+        # Forward request to Matrix Synapse with headers
+        headers = {
+            'User-Agent': 'Cravex-Admin-Panel/1.0'
+        }
+        
+        response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
         
         if response.status_code == 200:
             # Get content type from response
@@ -2862,11 +2867,38 @@ def proxy_media_download(server_name, media_id):
                 }
             )
         else:
-            print(f"[WARN] Media download failed: {response.status_code} - {response.text[:200]}")
+            error_text = response.text[:500] if hasattr(response, 'text') else str(response.content[:500])
+            print(f"[WARN] Media download failed: {response.status_code}")
+            print(f"[WARN] Response headers: {dict(response.headers)}")
+            print(f"[WARN] Response text: {error_text}")
+            print(f"[WARN] Request URL: {media_url}")
+            
+            # Try alternative URL format (without server_name in path)
+            if response.status_code == 404:
+                alt_url = f'{synapse_url}/_matrix/media/r0/download/{media_id}'
+                print(f"[DEBUG] Trying alternative URL: {alt_url}")
+                alt_response = requests.get(alt_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if alt_response.status_code == 200:
+                    content_type = alt_response.headers.get('Content-Type', 'application/octet-stream')
+                    def generate():
+                        for chunk in alt_response.iter_content(chunk_size=8192):
+                            if chunk:
+                                yield chunk
+                    return Response(
+                        generate(),
+                        mimetype=content_type,
+                        headers={
+                            'Content-Disposition': f'inline; filename="{media_id}"',
+                            'Cache-Control': 'public, max-age=3600',
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    )
+            
             return jsonify({
                 'errcode': 'M_NOT_FOUND',
                 'error': f'Media not found: {response.status_code}',
-                'details': response.text[:200] if hasattr(response, 'text') else ''
+                'details': error_text,
+                'requested_url': media_url
             }), response.status_code
             
     except requests.exceptions.RequestException as e:
@@ -2896,8 +2928,15 @@ def proxy_media_thumbnail(server_name, media_id):
         
         thumbnail_url = f'{synapse_url}/_matrix/media/r0/thumbnail/{server_name}/{media_id}?width={width}&height={height}&method={method}'
         
-        # Forward request to Matrix Synapse
-        response = requests.get(thumbnail_url, stream=True, timeout=30, allow_redirects=True)
+        print(f"[DEBUG] Proxying thumbnail: {thumbnail_url}")
+        print(f"[DEBUG] Server name: {server_name}, Media ID: {media_id}")
+        
+        # Forward request to Matrix Synapse with headers
+        headers = {
+            'User-Agent': 'Cravex-Admin-Panel/1.0'
+        }
+        
+        response = requests.get(thumbnail_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
         
         if response.status_code == 200:
             # Get content type from response
@@ -2913,13 +2952,42 @@ def proxy_media_thumbnail(server_name, media_id):
                 generate(),
                 mimetype=content_type,
                 headers={
-                    'Cache-Control': 'public, max-age=3600'
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*'
                 }
             )
         else:
+            error_text = response.text[:500] if hasattr(response, 'text') else str(response.content[:500])
+            print(f"[WARN] Thumbnail download failed: {response.status_code}")
+            print(f"[WARN] Response text: {error_text}")
+            print(f"[WARN] Request URL: {thumbnail_url}")
+            
+            # Try alternative URL format (without server_name in path) or fallback to download
+            if response.status_code == 404:
+                # Try download endpoint as fallback
+                download_url = f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
+                print(f"[DEBUG] Trying download endpoint as fallback: {download_url}")
+                alt_response = requests.get(download_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if alt_response.status_code == 200:
+                    content_type = alt_response.headers.get('Content-Type', 'image/jpeg')
+                    def generate():
+                        for chunk in alt_response.iter_content(chunk_size=8192):
+                            if chunk:
+                                yield chunk
+                    return Response(
+                        generate(),
+                        mimetype=content_type,
+                        headers={
+                            'Cache-Control': 'public, max-age=3600',
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    )
+            
             return jsonify({
                 'errcode': 'M_NOT_FOUND',
-                'error': f'Thumbnail not found: {response.status_code}'
+                'error': f'Thumbnail not found: {response.status_code}',
+                'details': error_text,
+                'requested_url': thumbnail_url
             }), response.status_code
             
     except requests.exceptions.RequestException as e:
