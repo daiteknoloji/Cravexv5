@@ -3353,10 +3353,13 @@
         }
         
         function exportData(format) {
+            const filterSenderEl = document.getElementById('filterSender');
+            const searchQueryEl = document.getElementById('searchQuery');
+            
             const params = new URLSearchParams({
-                room_id: document.getElementById('filterRoomId').value,
-                sender: document.getElementById('filterSender').value,
-                search: document.getElementById('searchQuery').value,
+                room_id: '',
+                sender: filterSenderEl ? filterSenderEl.value : '',
+                search: searchQueryEl ? searchQueryEl.value : '',
                 format: format
             });
             window.location.href = '/api/export?' + params;
@@ -3406,29 +3409,35 @@
         }
         
         function clearFilters() {
-            document.getElementById('filterStartDate').value = '';
-            document.getElementById('filterEndDate').value = '';
-            document.getElementById('quickDateFilter').value = '';
-            document.getElementById('filterRoomId').value = '';
-            document.getElementById('filterSender').value = '';
-            document.getElementById('filterReceiver').value = '';
-            document.getElementById('searchQuery').value = '';
+            const filterSenderEl = document.getElementById('filterSender');
+            const searchQueryEl = document.getElementById('searchQuery');
+            const quickDateFilterEl = document.getElementById('quickDateFilter');
+            
+            if (filterSenderEl) filterSenderEl.value = '';
+            if (searchQueryEl) searchQueryEl.value = '';
+            if (quickDateFilterEl) quickDateFilterEl.value = '';
             
             messagePage = 1;
             
-            document.getElementById('messagesContent').innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
-                    <div class="empty-text">Mesajları görüntülemek için filtreleri kullanın</div>
-                </div>
-            `;
+            const messagesContent = document.getElementById('messagesContent');
+            if (messagesContent) {
+                messagesContent.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <div class="empty-text">Mesajları görüntülemek için filtreleri kullanın</div>
+                    </div>
+                `;
+            }
             
-            document.getElementById('messagePagination').style.display = 'none';
+            const messagePagination = document.getElementById('messagePagination');
+            if (messagePagination) {
+                messagePagination.style.display = 'none';
+            }
         }
         
         // Enter key support for message search
         document.addEventListener('DOMContentLoaded', () => {
-            const inputs = ['filterRoomId', 'filterSender', 'searchQuery'];
+            const inputs = ['filterSender', 'searchQuery'];
             inputs.forEach(id => {
                 const element = document.getElementById(id);
                 if (element) {
