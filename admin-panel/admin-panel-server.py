@@ -1834,7 +1834,7 @@ def toggle_user_deactivate(user_id):
 @app.route('/api/users/<user_id>', methods=['DELETE'])
 @login_required
 def delete_user(user_id):
-    """Delete user (deactivate and mark as erased)"""
+    """Delete user completely from database"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -1846,11 +1846,7 @@ def delete_user(user_id):
             conn.close()
             return jsonify({'error': 'Kullanıcı bulunamadı', 'success': False}), 404
         
-        # Deactivate user
-        cur.execute("""
-            UPDATE users SET deactivated = 1 WHERE name = %s
-        """, (user_id,))
-        
+        # Delete related data first (foreign key constraints)
         # Delete access tokens (logout all sessions)
         cur.execute("""
             DELETE FROM access_tokens WHERE user_id = %s
@@ -1859,6 +1855,30 @@ def delete_user(user_id):
         # Delete devices
         cur.execute("""
             DELETE FROM devices WHERE user_id = %s
+        """, (user_id,))
+        
+        # Delete room memberships
+        cur.execute("""
+            DELETE FROM room_memberships WHERE user_id = %s
+        """, (user_id,))
+        
+        # Delete user directory entries
+        cur.execute("""
+            DELETE FROM user_directory WHERE user_id = %s
+        """, (user_id,))
+        
+        cur.execute("""
+            DELETE FROM user_directory_search WHERE user_id = %s
+        """, (user_id,))
+        
+        # Delete profiles
+        cur.execute("""
+            DELETE FROM profiles WHERE user_id = %s
+        """, (user_id,))
+        
+        # Delete user from users table (MAIN DELETE)
+        cur.execute("""
+            DELETE FROM users WHERE name = %s
         """, (user_id,))
         
         conn.commit()
