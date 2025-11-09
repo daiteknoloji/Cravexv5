@@ -2902,15 +2902,17 @@ def proxy_media_download(server_name, media_id):
             print(f"[WARN] Response text: {error_text}")
             print(f"[WARN] Request URL: {media_url}")
             
-            # Try alternative URL format (without server_name in path)
+            # Try alternative URL formats
             if response.status_code == 404:
-                alt_url = f'{synapse_url}/_matrix/media/r0/download/{media_id}'
-                print(f"[DEBUG] Trying alternative URL: {alt_url}")
-                alt_response = requests.get(alt_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
-                if alt_response.status_code == 200:
-                    content_type = alt_response.headers.get('Content-Type', 'application/octet-stream')
+                # Try 1: Without server_name in path
+                alt_url1 = f'{synapse_url}/_matrix/media/r0/download/{media_id}'
+                print(f"[DEBUG] Trying alternative URL 1: {alt_url1}")
+                alt_response1 = requests.get(alt_url1, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if alt_response1.status_code == 200:
+                    print(f"[DEBUG] Alternative URL 1 worked!")
+                    content_type = alt_response1.headers.get('Content-Type', 'application/octet-stream')
                     def generate():
-                        for chunk in alt_response.iter_content(chunk_size=8192):
+                        for chunk in alt_response1.iter_content(chunk_size=8192):
                             if chunk:
                                 yield chunk
                     return Response(
@@ -2922,6 +2924,31 @@ def proxy_media_download(server_name, media_id):
                             'Access-Control-Allow-Origin': '*'
                         }
                     )
+                
+                # Try 2: Check if media is on a different server (federated)
+                # If server_name != homeserver_domain, try the media on the original server
+                homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'matrix-synapse.up.railway.app')
+                if server_name != homeserver_domain:
+                    federated_url = f'https://{server_name}/_matrix/media/r0/download/{server_name}/{media_id}'
+                    print(f"[DEBUG] Media might be federated. Server: {server_name}, Homeserver: {homeserver_domain}")
+                    print(f"[DEBUG] Trying federated URL: {federated_url}")
+                    fed_response = requests.get(federated_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                    if fed_response.status_code == 200:
+                        print(f"[DEBUG] Federated URL worked!")
+                        content_type = fed_response.headers.get('Content-Type', 'application/octet-stream')
+                        def generate():
+                            for chunk in fed_response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    yield chunk
+                        return Response(
+                            generate(),
+                            mimetype=content_type,
+                            headers={
+                                'Content-Disposition': f'inline; filename="{media_id}"',
+                                'Cache-Control': 'public, max-age=3600',
+                                'Access-Control-Allow-Origin': '*'
+                            }
+                        )
             
             return jsonify({
                 'errcode': 'M_NOT_FOUND',
