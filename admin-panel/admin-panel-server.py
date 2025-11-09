@@ -1906,16 +1906,28 @@ def add_room_member(room_id):
         
         if not admin_in_room:
             try:
-                print(f"Admin not in room, adding admin first...")
-                admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
-                admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': ADMIN_USER_ID}, timeout=5)
-                print(f"Admin join result: {admin_response.status_code}")
+                print(f"[INFO] Admin not in room, adding admin first via Client API...")
+                # Try Client API v3 join first (more reliable for private rooms)
+                client_join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                admin_client_response = requests.post(client_join_url, headers=headers, json={}, timeout=10)
+                print(f"[INFO] Admin Client API join result: {admin_client_response.status_code} - {admin_client_response.text[:200]}")
                 
-                if admin_response.status_code != 200:
-                    print(f"Admin join failed: {admin_response.text}")
-                    # Continue anyway, maybe user can be added
+                if admin_client_response.status_code != 200:
+                    # If Client API fails, try Admin API
+                    print(f"[WARN] Client API failed, trying Admin API...")
+                    admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
+                    admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                    print(f"[INFO] Admin API join result: {admin_response.status_code} - {admin_response.text[:200]}")
+                    
+                    if admin_response.status_code != 200:
+                        print(f"[WARN] Admin join failed: {admin_response.text}")
+                        # Continue anyway, maybe user can be added via invite
+                else:
+                    print(f"[INFO] ✅ Admin successfully joined room via Client API!")
             except Exception as admin_err:
-                print(f"Admin join attempt failed: {admin_err}")
+                print(f"[ERROR] Admin join attempt failed: {admin_err}")
+                import traceback
+                traceback.print_exc()
                 # Continue anyway
         
         # Step 2: Try Admin API join first (this sends notification)
