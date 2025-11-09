@@ -2801,8 +2801,44 @@ def create_user():
                     
                     if not login_success:
                         print(f"[ERROR] Matrix API created user but password verification failed!")
-                        print(f"[ERROR] Falling back to database method to ensure password works...")
-                        # Don't return, continue to database fallback
+                        print(f"[ERROR] Resetting password via Matrix Admin API...")
+                        # Reset password via Matrix Admin API to ensure it works
+                        try:
+                            reset_response = requests.post(
+                                f'{synapse_url}/_synapse/admin/v1/reset_password/{user_id}',
+                                headers=headers,
+                                json={'new_password': password, 'logout_devices': False},
+                                timeout=10
+                            )
+                            if reset_response.status_code == 200:
+                                print(f"[INFO] Password reset via Matrix Admin API successful!")
+                                # Verify again
+                                test_login2 = requests.post(
+                                    f'{synapse_url}/_matrix/client/v3/login',
+                                    json={
+                                        'type': 'm.login.password',
+                                        'identifier': {'type': 'm.id.user', 'user': username},
+                                        'password': password
+                                    },
+                                    timeout=5
+                                )
+                                if test_login2.status_code == 200:
+                                    print(f"[INFO] Password verification after reset successful!")
+                                    return jsonify({
+                                        'success': True,
+                                        'user_id': user_id,
+                                        'message': 'User created successfully via Matrix API (password reset)!',
+                                        'method': 'matrix_api_reset'
+                                    })
+                                else:
+                                    print(f"[WARN] Password still doesn't work after reset: {test_login2.status_code}")
+                                    # Continue to database fallback
+                            else:
+                                print(f"[WARN] Password reset failed: {reset_response.status_code} - {reset_response.text[:100]}")
+                                # Continue to database fallback
+                        except Exception as reset_error:
+                            print(f"[WARN] Password reset error: {reset_error}")
+                            # Continue to database fallback
                     else:
                         return jsonify({
                             'success': True,
