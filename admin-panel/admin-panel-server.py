@@ -1845,48 +1845,58 @@ def toggle_user_deactivate(user_id):
                 except Exception as login_error:
                     print(f"[WARN] Auto-login failed: {login_error}")
         
-        # Use Matrix Admin API
+        # Try Matrix Admin API (but don't fail if it's unavailable)
+        matrix_api_success = False
         if admin_token:
-            synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-            headers = {
-                'Authorization': f'Bearer {admin_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            if deactivate:
-                # Deactivate via Synapse Admin API
-                api_url = f'{synapse_url}/_synapse/admin/v1/deactivate/{user_id}'
-                response = requests.post(
-                    api_url, 
-                    headers=headers, 
-                    json={'erase': False},
-                    timeout=10
-                )
+            try:
+                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+                headers = {
+                    'Authorization': f'Bearer {admin_token}',
+                    'Content-Type': 'application/json'
+                }
                 
-                if response.status_code == 200:
-                    print(f"[INFO] User deactivated via Matrix API: {user_id}")
+                if deactivate:
+                    # Deactivate via Synapse Admin API
+                    api_url = f'{synapse_url}/_synapse/admin/v1/deactivate/{user_id}'
+                    try:
+                        response = requests.post(
+                            api_url, 
+                            headers=headers, 
+                            json={'erase': False},
+                            timeout=5  # Reduced timeout
+                        )
+                        
+                        if response.status_code == 200:
+                            print(f"[INFO] User deactivated via Matrix API: {user_id}")
+                            matrix_api_success = True
+                        else:
+                            print(f"[WARN] Matrix API deactivate failed: {response.status_code}")
+                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                        print(f"[WARN] Matrix API timeout/connection error (will use database only): {e}")
+                    
+                    # Always delete tokens/devices (even if API failed)
+                    cur.execute("DELETE FROM access_tokens WHERE user_id = %s", (user_id,))
+                    cur.execute("DELETE FROM devices WHERE user_id = %s", (user_id,))
                 else:
-                    print(f"[WARN] Matrix API deactivate failed: {response.status_code}")
-                
-                # Always delete tokens/devices
-                cur.execute("DELETE FROM access_tokens WHERE user_id = %s", (user_id,))
-                cur.execute("DELETE FROM devices WHERE user_id = %s", (user_id,))
-            else:
-                # Activate via Synapse Admin API v2
-                # IMPORTANT: Only send deactivated: false, don't send password or other fields
-                # This preserves the existing password
-                api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
-                response = requests.put(
-                    api_url, 
-                    headers=headers, 
-                    json={'deactivated': False},  # Only this field, password will be preserved
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    print(f"[INFO] User activated via Matrix API (password preserved): {user_id}")
-                else:
-                    print(f"[WARN] Matrix API activate failed: {response.status_code} - {response.text[:200]}")
+                    # Activate via Synapse Admin API v2
+                    api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
+                    try:
+                        response = requests.put(
+                            api_url, 
+                            headers=headers, 
+                            json={'deactivated': False},
+                            timeout=5  # Reduced timeout
+                        )
+                        
+                        if response.status_code == 200:
+                            print(f"[INFO] User activated via Matrix API: {user_id}")
+                            matrix_api_success = True
+                        else:
+                            print(f"[WARN] Matrix API activate failed: {response.status_code} - {response.text[:200]}")
+                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                        print(f"[WARN] Matrix API timeout/connection error (will use database only): {e}")
+            except Exception as api_error:
+                print(f"[WARN] Matrix API error (will use database only): {api_error}")
         
         # Update database
         cur.execute("""
@@ -1898,15 +1908,21 @@ def toggle_user_deactivate(user_id):
         conn.close()
         
         if deactivate:
+            msg = f'Kullanıcı pasif yapıldı - Tüm oturumlar kapatıldı'
+            if not matrix_api_success:
+                msg += ' (Sadece veritabanı güncellendi - Matrix API kullanılamadı)'
             return jsonify({
                 'success': True,
-                'message': f'Kullanıcı pasif yapıldı - Tüm oturumlar kapatıldı',
+                'message': msg,
                 'deactivated': True
             })
         else:
+            msg = f'Kullanıcı aktif yapıldı - Artık login olabilir'
+            if not matrix_api_success:
+                msg += ' (Sadece veritabanı güncellendi - Matrix API kullanılamadı)'
             return jsonify({
                 'success': True,
-                'message': f'Kullanıcı aktif yapıldı - Artık login olabilir',
+                'message': msg,
                 'deactivated': False
             })
         
@@ -2018,26 +2034,39 @@ def change_user_password(user_id):
             cur.close()
             conn.close()
             
-            # If we have a token, use Matrix Admin API
+            # If we have a token, try Matrix Admin API (but don't fail if unavailable)
             if admin_token:
-                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-                headers = {
-                    'Authorization': f'Bearer {admin_token}',
-                    'Content-Type': 'application/json'
-                }
-                
-                # Reset password via Synapse Admin API
-                api_url = f'{synapse_url}/_synapse/admin/v1/reset_password/{user_id}'
-                response = requests.post(api_url, headers=headers, json={'new_password': new_password, 'logout_devices': False}, timeout=10)
-                
-                if response.status_code == 200:
-                    return jsonify({
-                        'success': True,
-                        'message': f'Şifre başarıyla değiştirildi (Matrix API)',
-                        'method': 'matrix_api'
-                    })
-                else:
-                    print(f"[WARN] Matrix API password change failed: {response.status_code} - {response.text[:200]}")
+                try:
+                    synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+                    headers = {
+                        'Authorization': f'Bearer {admin_token}',
+                        'Content-Type': 'application/json'
+                    }
+                    
+                    # Reset password via Synapse Admin API
+                    api_url = f'{synapse_url}/_synapse/admin/v1/reset_password/{user_id}'
+                    try:
+                        response = requests.post(
+                            api_url, 
+                            headers=headers, 
+                            json={'new_password': new_password, 'logout_devices': False}, 
+                            timeout=5
+                        )
+                        
+                        if response.status_code == 200:
+                            return jsonify({
+                                'success': True,
+                                'message': f'Şifre başarıyla değiştirildi (Matrix API)',
+                                'method': 'matrix_api'
+                            })
+                        else:
+                            print(f"[WARN] Matrix API password change failed: {response.status_code} - {response.text[:200]}")
+                            # Fallback to database method
+                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                        print(f"[WARN] Matrix API timeout/connection error (will use database): {e}")
+                        # Fallback to database method
+                except Exception as api_error:
+                    print(f"[WARN] Matrix API error (will use database): {api_error}")
                     # Fallback to database method
             
             # Fallback: Database method
