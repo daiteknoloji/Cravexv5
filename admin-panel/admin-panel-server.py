@@ -2178,38 +2178,45 @@ def create_user():
                         print(f"[WARN] Auto-login error: {login_error}")
             
             if admin_token:
-                # Matrix API available - use it
-                import requests
-                
-                print(f"[DEBUG] Admin token found: {admin_token[:20]}...")
-                
-                headers = {
-                    'Authorization': f'Bearer {admin_token}',
-                    'Content-Type': 'application/json'
-                }
-                
-                user_data = {
-                    'password': password,
-                    'displayname': displayname if displayname else username,
-                    'admin': make_admin
-                }
-                
-                # Use Synapse URL (localhost for local, Railway URL for production)
-                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-                api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
-                
-                print(f"[DEBUG] Calling Synapse API: {api_url}")
-                response = requests.put(api_url, headers=headers, json=user_data, timeout=10)
-                print(f"[DEBUG] Synapse API response: {response.status_code} - {response.text[:100]}")
-                
-                if response.status_code == 200 or response.status_code == 201:
-                    return jsonify({
-                        'success': True,
-                        'user_id': user_id,
-                        'message': 'User created successfully via Matrix API!'
-                    })
-                else:
-                    print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
+                # Try Matrix API (but don't fail if unavailable)
+                try:
+                    import requests
+                    
+                    print(f"[DEBUG] Admin token found: {admin_token[:20]}...")
+                    
+                    headers = {
+                        'Authorization': f'Bearer {admin_token}',
+                        'Content-Type': 'application/json'
+                    }
+                    
+                    user_data = {
+                        'password': password,
+                        'displayname': displayname if displayname else username,
+                        'admin': make_admin,
+                        'deactivated': False
+                    }
+                    
+                    # Use Synapse URL (localhost for local, Railway URL for production)
+                    synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+                    api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
+                    
+                    print(f"[DEBUG] Calling Synapse API: {api_url}")
+                    try:
+                        response = requests.put(api_url, headers=headers, json=user_data, timeout=5)
+                        print(f"[DEBUG] Synapse API response: {response.status_code} - {response.text[:100]}")
+                        
+                        if response.status_code == 200 or response.status_code == 201:
+                            return jsonify({
+                                'success': True,
+                                'user_id': user_id,
+                                'message': 'User created successfully via Matrix API!'
+                            })
+                        else:
+                            print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
+                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                        print(f"[WARN] Matrix API timeout/connection error (will use database): {e}")
+                except Exception as api_error:
+                    print(f"[WARN] Matrix API error (will use database): {api_error}")
         except Exception as api_error:
             print(f"[INFO] Matrix API not available, using database fallback: {api_error}")
         
