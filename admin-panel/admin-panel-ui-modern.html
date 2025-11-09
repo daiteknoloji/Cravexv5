@@ -1855,9 +1855,12 @@
                                          alt="Fotoğraf" 
                                          style="width: 100%; height: auto; display: block; cursor: pointer;"
                                          onclick="window.open('${msg.media_http_url}', '_blank');"
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                         crossorigin="anonymous"
+                                         referrerpolicy="no-referrer"
+                                         onerror="console.error('Image load error:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';">
                                     <div style="display: none; padding: 12px; text-align: center; color: var(--text-muted);">
-                                        <i class="fas fa-exclamation-triangle"></i> Resim yüklenemedi
+                                        <i class="fas fa-exclamation-triangle"></i> Resim yüklenemedi<br>
+                                        <small style="font-size: 10px; margin-top: 4px; display: block;">URL: ${msg.media_http_url || 'Yok'}</small>
                                     </div>
                                 </div>
                                 <a href="${msg.media_http_url}" 
@@ -2847,9 +2850,12 @@
                                          alt="Fotoğraf" 
                                          style="width: 100%; height: auto; display: block; cursor: pointer;"
                                          onclick="event.stopPropagation(); window.open('${msg.media_http_url}', '_blank');"
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                         crossorigin="anonymous"
+                                         referrerpolicy="no-referrer"
+                                         onerror="console.error('Image load error:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';">
                                     <div style="display: none; padding: 12px; text-align: center; color: var(--text-muted);">
-                                        <i class="fas fa-exclamation-triangle"></i> Resim yüklenemedi
+                                        <i class="fas fa-exclamation-triangle"></i> Resim yüklenemedi<br>
+                                        <small style="font-size: 10px; margin-top: 4px; display: block;">URL: ${msg.media_http_url || 'Yok'}</small>
                                     </div>
                                 </div>
                                 <a href="${msg.media_http_url}" 

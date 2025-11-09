@@ -1166,19 +1166,41 @@ def get_messages():
                     room_name = 'İsimsiz oda'
             
             # Convert MXC URL to HTTP URL if needed
+            # MXC format: mxc://server.com/media_id
+            # HTTP format: https://server.com/_matrix/media/r0/download/server.com/media_id
             media_http_url = None
             thumbnail_http_url = None
             homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'matrix-synapse.up.railway.app')
             synapse_url = os.getenv('SYNAPSE_URL', f'https://{homeserver_domain}')
             
-            if media_url and media_url.startswith('mxc://'):
-                # Convert mxc://server.com/media_id to https://server.com/_matrix/media/r0/download/server.com/media_id
-                mxc_path = media_url.replace('mxc://', '')
-                media_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
+            def mxc_to_http(mxc_url, use_thumbnail=False):
+                """Convert MXC URL to HTTP URL"""
+                if not mxc_url or not mxc_url.startswith('mxc://'):
+                    return None
+                
+                # Parse mxc://server.com/media_id
+                mxc_path = mxc_url.replace('mxc://', '')
+                if '/' not in mxc_path:
+                    return None
+                
+                server_name, media_id = mxc_path.split('/', 1)
+                
+                if use_thumbnail:
+                    # Thumbnail endpoint with size parameters
+                    return f'{synapse_url}/_matrix/media/r0/thumbnail/{server_name}/{media_id}?width=800&height=600&method=scale'
+                else:
+                    # Download endpoint
+                    return f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
             
-            if thumbnail_url and thumbnail_url.startswith('mxc://'):
-                mxc_path = thumbnail_url.replace('mxc://', '')
-                thumbnail_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
+            if media_url:
+                media_http_url = mxc_to_http(media_url, use_thumbnail=False)
+            
+            if thumbnail_url:
+                thumbnail_http_url = mxc_to_http(thumbnail_url, use_thumbnail=True)
+            elif media_url:
+                # If no thumbnail_url but we have media_url, use thumbnail endpoint for images
+                if msgtype == 'm.image':
+                    thumbnail_http_url = mxc_to_http(media_url, use_thumbnail=True)
             
             messages.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
@@ -1411,18 +1433,41 @@ def get_room_messages(room_id):
             thumbnail_url = row[9] if len(row) > 9 else None
             
             # Convert MXC URL to HTTP URL if needed
+            # MXC format: mxc://server.com/media_id
+            # HTTP format: https://server.com/_matrix/media/r0/download/server.com/media_id
             media_http_url = None
             thumbnail_http_url = None
             homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'matrix-synapse.up.railway.app')
             synapse_url = os.getenv('SYNAPSE_URL', f'https://{homeserver_domain}')
             
-            if media_url and media_url.startswith('mxc://'):
-                mxc_path = media_url.replace('mxc://', '')
-                media_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
+            def mxc_to_http(mxc_url, use_thumbnail=False):
+                """Convert MXC URL to HTTP URL"""
+                if not mxc_url or not mxc_url.startswith('mxc://'):
+                    return None
+                
+                # Parse mxc://server.com/media_id
+                mxc_path = mxc_url.replace('mxc://', '')
+                if '/' not in mxc_path:
+                    return None
+                
+                server_name, media_id = mxc_path.split('/', 1)
+                
+                if use_thumbnail:
+                    # Thumbnail endpoint with size parameters
+                    return f'{synapse_url}/_matrix/media/r0/thumbnail/{server_name}/{media_id}?width=800&height=600&method=scale'
+                else:
+                    # Download endpoint
+                    return f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
             
-            if thumbnail_url and thumbnail_url.startswith('mxc://'):
-                mxc_path = thumbnail_url.replace('mxc://', '')
-                thumbnail_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
+            if media_url:
+                media_http_url = mxc_to_http(media_url, use_thumbnail=False)
+            
+            if thumbnail_url:
+                thumbnail_http_url = mxc_to_http(thumbnail_url, use_thumbnail=True)
+            elif media_url:
+                # If no thumbnail_url but we have media_url, use thumbnail endpoint for images
+                if msgtype == 'm.image':
+                    thumbnail_http_url = mxc_to_http(media_url, use_thumbnail=True)
             
             messages.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
