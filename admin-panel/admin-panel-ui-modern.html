@@ -2238,7 +2238,15 @@
             const pageUsers = deletedUsers.slice(startIndex, endIndex);
             
             if (deletedUsers.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><div class="empty-text">Silinen kullanıcı bulunamadı</div></div>';
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-user-slash" style="font-size: 48px; color: var(--text-muted); margin-bottom: 16px;"></i>
+                        <div class="empty-text" style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Silinen kullanıcı bulunamadı</div>
+                        <div style="color: var(--text-muted); font-size: 14px; margin-top: 8px;">
+                            Henüz hiç kullanıcı silinmemiş. Kullanıcıları silmek için "Kullanıcılar" sekmesinden "Sil" butonunu kullanın.
+                        </div>
+                    </div>
+                `;
                 document.getElementById('deletedUsersShowingText').textContent = '0 kullanıcı gösteriliyor';
                 document.getElementById('deletedUsersCurrentPage').textContent = '0';
                 document.getElementById('deletedUsersTotalPages').textContent = '0';
