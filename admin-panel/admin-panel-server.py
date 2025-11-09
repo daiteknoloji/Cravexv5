@@ -132,11 +132,11 @@ def get_media_from_cache(media_id):
         return None
 
 def save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type=None, sender_user_id=None, event_id=None):
-    """Media dosyasını cache'e kaydet (sadece küçük dosyalar için)"""
-    MAX_CACHE_SIZE_MB = 5  # 5MB'dan küçük dosyalar cache'lenir
+    """Media dosyasını cache'e kaydet (tüm dosyalar için - limit kaldırıldı)"""
+    MAX_CACHE_SIZE_MB = 100  # 100MB'a kadar dosyalar cache'lenir (limit artırıldı)
     file_size = len(media_data) if isinstance(media_data, bytes) else len(media_data.encode())
     
-    # Büyük dosyaları cache'leme
+    # Çok büyük dosyaları cache'leme (100MB üzeri)
     if file_size > MAX_CACHE_SIZE_MB * 1024 * 1024:
         print(f"[INFO] Media too large to cache: {media_id} ({file_size / 1024 / 1024:.2f} MB)")
         return False
@@ -169,6 +169,154 @@ def save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type
 
 # Initialize media cache table on startup
 init_media_cache_table()
+
+def auto_cache_media_from_message(media_url, sender, event_id, msgtype=None, thumbnail_url=None):
+    """
+    Mesajdan medya URL'sini alıp otomatik olarak cache'e kaydet
+    
+    Args:
+        media_url: MXC URL (mxc://server.com/media_id)
+        sender: Gönderen kullanıcı ID'si
+        event_id: Event ID
+        msgtype: Mesaj tipi (m.image, m.file, m.audio, m.video, vb.)
+        thumbnail_url: Thumbnail MXC URL (opsiyonel)
+    
+    Returns:
+        bool: Başarılı ise True
+    """
+    if not media_url or not media_url.startswith('mxc://'):
+        return False
+    
+    try:
+        # Parse MXC URL: mxc://server.com/media_id
+        mxc_path = media_url.replace('mxc://', '')
+        if '/' not in mxc_path:
+            return False
+        
+        server_name, media_id = mxc_path.split('/', 1)
+        
+        # Cache'de var mı kontrol et
+        cached = get_media_from_cache(media_id)
+        if cached:
+            print(f"[INFO] Media already cached: {media_id}")
+            return True
+        
+        # Matrix Synapse'den indir
+        print(f"[INFO] Auto-caching media from message: {media_id} (sender: {sender})")
+        
+        synapse_url = os.getenv('SYNAPSE_URL', f'https://{server_name}')
+        homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'matrix-synapse.up.railway.app')
+        
+        # Sender'ın token'ını al
+        sender_token = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                (sender,)
+            )
+            token_row = cur.fetchone()
+            sender_token = token_row[0] if token_row else None
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f"[WARN] Could not get sender token for auto-cache: {e}")
+        
+        # Admin token fallback
+        if not sender_token:
+            try:
+                admin_username = os.getenv('ADMIN_USERNAME', 'admin')
+                admin_password = os.getenv('ADMIN_PASSWORD')
+                if admin_password:
+                    import requests
+                    login_response = requests.post(
+                        f'{synapse_url}/_matrix/client/v3/login',
+                        json={
+                            'type': 'm.login.password',
+                            'identifier': {'type': 'm.id.user', 'user': admin_username},
+                            'password': admin_password
+                        },
+                        timeout=5
+                    )
+                    if login_response.status_code == 200:
+                        sender_token = login_response.json().get('access_token')
+            except Exception as e:
+                print(f"[WARN] Admin auto-login failed for auto-cache: {e}")
+        
+        # Matrix Synapse'den medya indir
+        headers = {
+            'User-Agent': 'Cravex-Admin-Panel/1.0',
+            'Accept': '*/*'
+        }
+        if sender_token:
+            headers['Authorization'] = f'Bearer {sender_token}'
+        
+        # Önce Client API v1 dene (Element Web format)
+        media_downloaded = False
+        media_data = None
+        content_type = None
+        
+        if sender_token:
+            client_api_v1_url = f'{synapse_url}/_matrix/client/v1/media/download/{server_name}/{media_id}?allow_redirect=true'
+            try:
+                import requests
+                response = requests.get(client_api_v1_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if response.status_code == 200:
+                    media_data = response.content
+                    content_type = response.headers.get('Content-Type', 'application/octet-stream')
+                    media_downloaded = True
+                    print(f"[INFO] ✅ Auto-cached media via Client API v1: {media_id}")
+            except Exception as e:
+                print(f"[WARN] Client API v1 failed for auto-cache: {e}")
+        
+        # Media API v3 dene (Element Web format, no auth)
+        if not media_downloaded:
+            media_v3_url = f'{synapse_url}/_matrix/media/v3/download/{server_name}/{media_id}?allow_redirect=true'
+            try:
+                import requests
+                media_v3_headers = {'User-Agent': 'Cravex-Admin-Panel/1.0', 'Accept': '*/*'}
+                response = requests.get(media_v3_url, stream=True, timeout=30, allow_redirects=True, headers=media_v3_headers)
+                if response.status_code == 200:
+                    media_data = response.content
+                    content_type = response.headers.get('Content-Type', 'application/octet-stream')
+                    media_downloaded = True
+                    print(f"[INFO] ✅ Auto-cached media via Media API v3: {media_id}")
+            except Exception as e:
+                print(f"[WARN] Media API v3 failed for auto-cache: {e}")
+        
+        # Fallback: Media API r0
+        if not media_downloaded:
+            media_r0_url = f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
+            try:
+                import requests
+                response = requests.get(media_r0_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if response.status_code == 200:
+                    media_data = response.content
+                    content_type = response.headers.get('Content-Type', 'application/octet-stream')
+                    media_downloaded = True
+                    print(f"[INFO] ✅ Auto-cached media via Media API r0: {media_id}")
+            except Exception as e:
+                print(f"[WARN] Media API r0 failed for auto-cache: {e}")
+        
+        # Cache'e kaydet
+        if media_downloaded and media_data:
+            success = save_media_to_cache(media_id, server_name, media_url, media_data, content_type, sender, event_id)
+            if success:
+                print(f"[INFO] ✅ Media auto-cached successfully: {media_id}")
+                return True
+            else:
+                print(f"[WARN] Failed to save media to cache: {media_id}")
+                return False
+        else:
+            print(f"[WARN] Could not download media for auto-cache: {media_id}")
+            return False
+            
+    except Exception as e:
+        print(f"[ERROR] Auto-cache media failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 # Login required decorator
 def login_required(f):
@@ -1336,6 +1484,14 @@ def get_messages():
             # Debug: Log MXC URL information
             if media_url:
                 print(f"[DEBUG] Message {row[14]}: MXC URL = {media_url}, Parsed HTTP URL = {media_http_url}")
+            
+            # Otomatik medya cache'leme: Mesajları okurken medya dosyalarını otomatik olarak cache'e kaydet
+            if media_url and sender and row[14]:  # media_url, sender, event_id varsa
+                try:
+                    # Background'da cache'le (blocking olmaması için)
+                    auto_cache_media_from_message(media_url, sender, row[14], msgtype, thumbnail_url)
+                except Exception as cache_err:
+                    print(f"[WARN] Auto-cache failed for message {row[14]}: {cache_err}")
             
             # Get sender's access token for media access (if available)
             sender_token = None
