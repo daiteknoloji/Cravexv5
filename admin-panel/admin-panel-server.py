@@ -1175,7 +1175,7 @@ def get_messages():
             synapse_url = os.getenv('SYNAPSE_URL', f'https://{homeserver_domain}')
             
             def mxc_to_http(mxc_url, use_thumbnail=False):
-                """Convert MXC URL to HTTP URL"""
+                """Convert MXC URL to HTTP URL (via proxy)"""
                 if not mxc_url or not mxc_url.startswith('mxc://'):
                     return None
                 
@@ -1186,12 +1186,13 @@ def get_messages():
                 
                 server_name, media_id = mxc_path.split('/', 1)
                 
+                # Use proxy endpoint to avoid CORS and authentication issues
                 if use_thumbnail:
-                    # Thumbnail endpoint with size parameters
-                    return f'{synapse_url}/_matrix/media/r0/thumbnail/{server_name}/{media_id}?width=800&height=600&method=scale'
+                    # Thumbnail endpoint with size parameters (via proxy)
+                    return f'/api/media/thumbnail/{server_name}/{media_id}?width=800&height=600&method=scale'
                 else:
-                    # Download endpoint
-                    return f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
+                    # Download endpoint (via proxy)
+                    return f'/api/media/download/{server_name}/{media_id}'
             
             if media_url:
                 media_http_url = mxc_to_http(media_url, use_thumbnail=False)
@@ -1442,7 +1443,7 @@ def get_room_messages(room_id):
             synapse_url = os.getenv('SYNAPSE_URL', f'https://{homeserver_domain}')
             
             def mxc_to_http(mxc_url, use_thumbnail=False):
-                """Convert MXC URL to HTTP URL"""
+                """Convert MXC URL to HTTP URL (via proxy)"""
                 if not mxc_url or not mxc_url.startswith('mxc://'):
                     return None
                 
@@ -1453,12 +1454,13 @@ def get_room_messages(room_id):
                 
                 server_name, media_id = mxc_path.split('/', 1)
                 
+                # Use proxy endpoint to avoid CORS and authentication issues
                 if use_thumbnail:
-                    # Thumbnail endpoint with size parameters
-                    return f'{synapse_url}/_matrix/media/r0/thumbnail/{server_name}/{media_id}?width=800&height=600&method=scale'
+                    # Thumbnail endpoint with size parameters (via proxy)
+                    return f'/api/media/thumbnail/{server_name}/{media_id}?width=800&height=600&method=scale'
                 else:
-                    # Download endpoint
-                    return f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
+                    # Download endpoint (via proxy)
+                    return f'/api/media/download/{server_name}/{media_id}'
             
             if media_url:
                 media_http_url = mxc_to_http(media_url, use_thumbnail=False)
