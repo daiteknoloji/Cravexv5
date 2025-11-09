@@ -2641,84 +2641,29 @@ def change_user_password(user_id):
                         'method': 'matrix_api'
                     })
                 else:
-                    print(f"[WARN] Matrix API password change failed: {response.status_code} - {response.text[:200]}")
-                    # Fallback to database method
+                    print(f"[ERROR] Matrix API password change failed: {response.status_code} - {response.text[:200]}")
+                    return jsonify({
+                        'error': f'Matrix API password change failed: {response.status_code} - {response.text[:200]}',
+                        'success': False
+                    }), 500
             
-            # Fallback: Database method
-            print(f"[INFO] Using database fallback for password change...")
-            conn = get_db_connection()
-            cur = conn.cursor()
+            # REMOVED: Database fallback - Matrix Admin API is now REQUIRED
+            # Matrix Synapse cannot read password_hash directly from database
+            # We MUST use Matrix Admin API for password changes
+            print(f"[ERROR] Admin token not found and auto-login failed!")
+            return jsonify({
+                'error': 'Matrix Admin API requires admin token. Please ensure ADMIN_PASSWORD is set correctly.',
+                'success': False
+            }), 500
             
-            # Hash password with bcrypt (12 rounds - same as Synapse)
-            # IMPORTANT: Matrix Synapse expects password_hash as TEXT/VARCHAR, not BYTEA
-            salt = bcrypt.gensalt(rounds=12)
-            password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
-            # Convert to string - Matrix Synapse stores as TEXT/VARCHAR
-            password_hash = password_hash_bytes.decode('utf-8')
-            print(f"[DEBUG] Password hash for {user_id}: {password_hash[:30]}...")
-            print(f"[DEBUG] Password hash type: {type(password_hash)}, is string: {isinstance(password_hash, str)}")
-            
-            # Update password in database
-            cur.execute("""
-                UPDATE users SET password_hash = %s WHERE name = %s
-            """, (password_hash, user_id))
-            
-            # Verify password hash was updated correctly
-            cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
-            verify_row = cur.fetchone()
-            if verify_row:
-                verify_hash = verify_row[0]
-                print(f"[DEBUG] Verified updated password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
-                print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
-            
-            conn.commit()
-            
-            # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
-            # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
-            import bcrypt
-            try:
-                # Get the actual hash from DB to verify (after commit)
-                cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
-                db_hash_row = cur.fetchone()
-                if db_hash_row and db_hash_row[0]:
-                    db_hash = db_hash_row[0]
-                    # Matrix Synapse stores password_hash as TEXT, so it's already a string
-                    # bcrypt.checkpw needs bytes, so encode the string
-                    if isinstance(db_hash, str):
-                        test_check = bcrypt.checkpw(new_password.encode('utf-8'), db_hash.encode('utf-8'))
-                    else:
-                        # If it's already bytes (shouldn't happen but just in case)
-                        test_check = bcrypt.checkpw(new_password.encode('utf-8'), db_hash)
-                    print(f"[DEBUG] Password verification test (bcrypt.checkpw) with DB hash: {test_check}")
-                    if not test_check:
-                        print(f"[ERROR] Password hash verification FAILED! Password does not match hash!")
-                        print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
-                        print(f"[ERROR] DB hash type: {type(db_hash)}, DB hash value: {db_hash[:50] if db_hash else 'NULL'}")
-                    else:
-                        print(f"[INFO] Password hash verification PASSED! Login should work!")
-                else:
-                    print(f"[WARN] Could not retrieve password hash from DB for verification")
-            except Exception as verify_error:
-                print(f"[WARN] Password verification error: {verify_error}")
-                import traceback
-                traceback.print_exc()
-            
-            affected_rows = cur.rowcount
-            cur.close()
-            conn.close()
-            
-            if affected_rows > 0:
-                return jsonify({
-                    'success': True,
-                    'message': f'Şifre başarıyla değiştirildi (Database)',
-                    'method': 'database'
-                })
-            else:
-                return jsonify({'error': 'Kullanıcı bulunamadı', 'success': False}), 404
-                
         except Exception as api_error:
             print(f"[ERROR] Password change error: {api_error}")
-            return jsonify({'error': f'Şifre değiştirilemedi: {str(api_error)}', 'success': False}), 500
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'error': f'Matrix API error: {str(api_error)}',
+                'success': False
+            }), 500
         
     except Exception as e:
         print(f"[HATA] PUT /api/users/{user_id}/password - {str(e)}")
@@ -2890,237 +2835,31 @@ def create_user():
                             'method': 'matrix_api'
                         })
                 else:
-                    print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
-                    print(f"[WARN] Error details: {response.text[:200]}")
-        except Exception as api_error:
-            print(f"[INFO] Matrix API not available, using database fallback: {api_error}")
-        
-        # Fallback: Direct database insert (for Railway or when Matrix API is unavailable)
-        import bcrypt
-        import time
-        
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Check if user exists
-        cur.execute("SELECT name, password_hash FROM users WHERE name = %s", (user_id,))
-        existing_user = cur.fetchone()
-        if existing_user:
-            # User exists - always update password hash to ensure it works
-            existing_hash = existing_user[1]
-            print(f"[INFO] User {user_id} already exists in database")
-            print(f"[INFO] Existing password hash: {existing_hash[:30] if existing_hash else 'NULL'}...")
-            print(f"[INFO] Updating password hash to ensure login works...")
-            
-            # Always update password hash (user might have been created via Matrix API but password doesn't work)
-            # IMPORTANT: Matrix Synapse expects password_hash as TEXT/VARCHAR, not BYTEA
-            salt = bcrypt.gensalt(rounds=12)
-            password_hash_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
-            # Convert to string - Matrix Synapse stores as TEXT/VARCHAR
-            password_hash = password_hash_bytes.decode('utf-8')
-            print(f"[DEBUG] Updated password hash for {user_id}: {password_hash[:30]}...")
-            cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
-            
-            # Verify password hash was updated correctly
-            cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
-            verify_row = cur.fetchone()
-            if verify_row:
-                verify_hash = verify_row[0]
-                print(f"[DEBUG] Verified updated password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
-                print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
-            
-            conn.commit()
-            
-            # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
-            # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
-            import bcrypt
-            try:
-                # Get the actual hash from DB to verify (after commit)
-                cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
-                db_hash_row = cur.fetchone()
-                if db_hash_row and db_hash_row[0]:
-                    db_hash = db_hash_row[0]
-                    # Matrix Synapse stores password_hash as TEXT, so it's already a string
-                    # bcrypt.checkpw needs bytes, so encode the string
-                    if isinstance(db_hash, str):
-                        test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash.encode('utf-8'))
-                    else:
-                        # If it's already bytes (shouldn't happen but just in case)
-                        test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash)
-                    print(f"[DEBUG] Password verification test (bcrypt.checkpw) with DB hash: {test_check}")
-                    if not test_check:
-                        print(f"[ERROR] Password hash verification FAILED! Password does not match hash!")
-                        print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
-                        print(f"[ERROR] DB hash type: {type(db_hash)}, DB hash value: {db_hash[:50] if db_hash else 'NULL'}")
-                    else:
-                        print(f"[INFO] Password hash verification PASSED! Login should work!")
-                else:
-                    print(f"[WARN] Could not retrieve password hash from DB for verification")
-            except Exception as verify_error:
-                print(f"[WARN] Password verification error: {verify_error}")
-                import traceback
-                traceback.print_exc()
-            
-            cur.close()
-            conn.close()
-            print(f"[INFO] Password hash updated successfully!")
-            return jsonify({
-                'success': True,
-                'user_id': user_id,
-                'message': 'User already exists - password hash updated!',
-                'method': 'database_update'
-            })
-        
-        # Hash password (bcrypt with 12 rounds - same as Synapse)
-        # IMPORTANT: Matrix Synapse expects password_hash as TEXT/VARCHAR, not BYTEA
-        # Use gensalt(rounds=12) to match Synapse's default
-        salt = bcrypt.gensalt(rounds=12)
-        password_hash_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
-        # Convert to string - Matrix Synapse stores as TEXT/VARCHAR
-        password_hash = password_hash_bytes.decode('utf-8')
-        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:30]}...")
-        print(f"[DEBUG] Password hash length: {len(password_hash)}, starts with: {password_hash[:7]}")
-        print(f"[DEBUG] Password hash type: {type(password_hash)}, is string: {isinstance(password_hash, str)}")
-        
-        # Insert user (with all required columns)
-        # Synapse uses milliseconds for creation_ts
-        creation_ts = int(time.time() * 1000)  # Convert to milliseconds
-        
-        # Check which columns exist in users table
-        cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name IN ('locked', 'suspended', 'approved', 'shadow_banned')
-        """)
-        existing_user_cols = [row[0] for row in cur.fetchall()]
-        has_locked = 'locked' in existing_user_cols
-        has_suspended = 'suspended' in existing_user_cols
-        has_approved = 'approved' in existing_user_cols
-        has_shadow_banned = 'shadow_banned' in existing_user_cols
-        
-        # Build INSERT query with available columns
-        base_cols = "name, password_hash, creation_ts, admin, is_guest, deactivated"
-        base_vals = "%s, %s, %s, %s, 0, 0"
-        params = [user_id, password_hash, creation_ts, 1 if make_admin else 0]
-        
-        if has_locked:
-            base_cols += ", locked"
-            base_vals += ", %s"
-            params.append(False)
-        if has_suspended:
-            base_cols += ", suspended"
-            base_vals += ", %s"
-            params.append(False)
-        if has_approved:
-            base_cols += ", approved"
-            base_vals += ", %s"
-            params.append(True)
-        if has_shadow_banned:
-            base_cols += ", shadow_banned"
-            base_vals += ", %s"
-            params.append(False)
-        
-        insert_query = f"""
-            INSERT INTO users ({base_cols})
-            VALUES ({base_vals})
-        """
-        
-        print(f"[INFO] Creating user {user_id} in database...")
-        cur.execute(insert_query, tuple(params))
-        print(f"[INFO] User {user_id} inserted into users table")
-        
-        # Verify password hash was inserted correctly
-        cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
-        verify_row = cur.fetchone()
-        if verify_row:
-            verify_hash = verify_row[0]
-            print(f"[DEBUG] Verified password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
-            print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
-        else:
-            print(f"[ERROR] User {user_id} not found in database after insert!")
-        
-        # Create profile (required for Matrix)
-        display_name_value = displayname if displayname else username
-        print(f"[INFO] Creating profile for {user_id}...")
-        try:
-            cur.execute("""
-                INSERT INTO profiles (user_id, displayname, full_user_id)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (user_id) DO UPDATE SET displayname = EXCLUDED.displayname, full_user_id = EXCLUDED.full_user_id
-            """, (user_id, display_name_value, user_id))
-            print(f"[INFO] Profile created/updated for {user_id}")
-        except Exception as profile_error:
-            print(f"[WARN] Profile creation failed: {profile_error}")
-        
-        # Add to user_directory (CRITICAL for login!)
-        print(f"[INFO] Adding {user_id} to user_directory...")
-        try:
-            cur.execute("""
-                INSERT INTO user_directory (user_id, display_name, avatar_url)
-                VALUES (%s, %s, NULL)
-                ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name
-            """, (user_id, display_name_value))
-            print(f"[INFO] User {user_id} added to user_directory")
-        except Exception as dir_error:
-            print(f"[WARN] user_directory insertion failed: {dir_error}")
-        
-        # Add to user_directory_search (for search functionality)
-        print(f"[INFO] Adding {user_id} to user_directory_search...")
-        try:
-            # Build search vector: lowercase username and display name
-            search_vector = f"'{HOMESERVER_DOMAIN}':2 '{username.lower()}':1A,3B"
-            cur.execute("""
-                INSERT INTO user_directory_search (user_id, vector)
-                VALUES (%s, %s)
-                ON CONFLICT (user_id) DO UPDATE SET vector = EXCLUDED.vector
-            """, (user_id, search_vector))
-            print(f"[INFO] User {user_id} added to user_directory_search")
-        except Exception as search_error:
-            print(f"[WARN] user_directory_search insertion failed: {search_error}")
-        
-        print(f"[INFO] Committing all changes to database...")
-        conn.commit()
-        print(f"[INFO] All database changes committed successfully!")
-        
-        # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
-        # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
-        import bcrypt
-        try:
-            # Get the actual hash from DB to verify (after commit)
-            cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
-            db_hash_row = cur.fetchone()
-            if db_hash_row and db_hash_row[0]:
-                db_hash = db_hash_row[0]
-                # Matrix Synapse stores password_hash as TEXT, so it's already a string
-                # bcrypt.checkpw needs bytes, so encode the string
-                if isinstance(db_hash, str):
-                    test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash.encode('utf-8'))
-                else:
-                    # If it's already bytes (shouldn't happen but just in case)
-                    test_check = bcrypt.checkpw(password.encode('utf-8'), db_hash)
-                print(f"[DEBUG] Password verification test (bcrypt.checkpw) with DB hash: {test_check}")
-                if not test_check:
-                    print(f"[ERROR] Password hash verification FAILED! Password '{password}' does not match hash!")
-                    print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
-                    print(f"[ERROR] DB hash type: {type(db_hash)}, DB hash value: {db_hash[:50] if db_hash else 'NULL'}")
-                else:
-                    print(f"[INFO] Password hash verification PASSED! Login should work!")
+                    print(f"[ERROR] Synapse API failed with {response.status_code}")
+                    print(f"[ERROR] Error details: {response.text[:200]}")
+                    return jsonify({
+                        'error': f'Matrix API failed: {response.status_code} - {response.text[:200]}',
+                        'success': False
+                    }), 500
             else:
-                print(f"[WARN] Could not retrieve password hash from DB for verification")
-        except Exception as verify_error:
-            print(f"[WARN] Password verification error: {verify_error}")
+                print(f"[ERROR] Admin token not found and auto-login failed!")
+                return jsonify({
+                    'error': 'Matrix Admin API requires admin token. Please ensure ADMIN_PASSWORD is set correctly.',
+                    'success': False
+                }), 500
+        except Exception as api_error:
+            print(f"[ERROR] Matrix API error: {api_error}")
             import traceback
             traceback.print_exc()
+            return jsonify({
+                'error': f'Matrix API error: {str(api_error)}',
+                'success': False
+            }), 500
         
-        cur.close()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'user_id': user_id,
-            'message': 'User created successfully via database! ⚠️ User will need to login in Element Web.',
-            'note': 'Created directly in database - may need Synapse restart for full sync'
-        })
+        # REMOVED: Database fallback - Matrix Admin API is now REQUIRED
+        # Matrix Synapse cannot read password_hash directly from database
+        # We MUST use Matrix Admin API for user creation and password management
+        # This ensures password hash is stored in the correct format that Matrix Synapse can read
         
     except Exception as e:
         print(f"[HATA] POST /api/users - {str(e)}")
