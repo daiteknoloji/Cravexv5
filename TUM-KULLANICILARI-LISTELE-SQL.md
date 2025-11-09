@@ -33,7 +33,7 @@ FROM users u
 ORDER BY u.admin DESC, u.deactivated ASC, u.name;
 ```
 
-## 3. Sadece Aktif Kullanıcılar (Deactivated = false)
+## 3. Sadece Aktif Kullanıcılar (Deactivated = 0)
 
 ```sql
 SELECT 
@@ -45,7 +45,7 @@ SELECT
      WHERE user_id = u.name AND membership = 'join') as room_count,
     (SELECT COUNT(*) FROM access_tokens WHERE user_id = u.name) as active_sessions
 FROM users u
-WHERE u.deactivated = false OR u.deactivated IS NULL
+WHERE u.deactivated = 0 OR u.deactivated IS NULL
 ORDER BY u.admin DESC, u.name;
 ```
 
@@ -60,7 +60,7 @@ SELECT
     (SELECT COUNT(DISTINCT room_id) FROM room_memberships 
      WHERE user_id = u.name AND membership = 'join') as room_count
 FROM users u
-WHERE u.deactivated = true
+WHERE u.deactivated = 1
 ORDER BY u.creation_ts DESC;
 ```
 
@@ -74,7 +74,7 @@ SELECT
     (SELECT displayname FROM profiles WHERE user_id = u.name LIMIT 1) as displayname,
     (SELECT COUNT(*) FROM access_tokens WHERE user_id = u.name) as active_sessions
 FROM users u
-WHERE u.admin = true
+WHERE u.admin = 1
 ORDER BY u.name;
 ```
 
@@ -131,9 +131,9 @@ ORDER BY u.creation_ts DESC;
 ```sql
 SELECT 
     COUNT(*) as total_users,
-    COUNT(*) FILTER (WHERE admin = true) as admin_count,
-    COUNT(*) FILTER (WHERE deactivated = true) as deactivated_count,
-    COUNT(*) FILTER (WHERE deactivated = false OR deactivated IS NULL) as active_count,
+    COUNT(*) FILTER (WHERE admin = 1) as admin_count,
+    COUNT(*) FILTER (WHERE deactivated = 1) as deactivated_count,
+    COUNT(*) FILTER (WHERE deactivated = 0 OR deactivated IS NULL) as active_count,
     COUNT(*) FILTER (WHERE EXISTS (
         SELECT 1 FROM access_tokens WHERE user_id = users.name
     )) as users_with_sessions
@@ -198,7 +198,14 @@ ORDER BY u.name;
 ## Kullanım Notları
 
 - `creation_ts` değeri milisaniye cinsinden olabilir, formatlamak için `TO_TIMESTAMP(creation_ts / 1000)` kullanın
-- `deactivated` NULL olabilir (eski Synapse versiyonlarında), bu durumda `deactivated = false` olarak kabul edilir
+- `deactivated` kolonu `smallint` tipindedir: `0` = aktif, `1` = deaktif, `NULL` = aktif (eski versiyonlar)
+- `admin` kolonu `smallint` tipindedir: `0` = normal kullanıcı, `1` = admin
 - `profiles` tablosunda kullanıcı profili olmayabilir, bu durumda `displayname` NULL döner
 - `room_memberships` tablosunda `membership = 'join'` olanlar aktif üyelikleri gösterir
+
+## ÖNEMLİ: PostgreSQL Tip Uyumluluğu
+
+PostgreSQL'de `admin` ve `deactivated` kolonları `smallint` (0/1) tipindedir, `boolean` değildir!
+- ✅ Doğru: `WHERE admin = 1` veya `WHERE deactivated = 0`
+- ❌ Yanlış: `WHERE admin = true` veya `WHERE deactivated = false`
 
