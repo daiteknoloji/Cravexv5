@@ -3027,38 +3027,64 @@ def proxy_media_download(server_name, media_id):
                     print(f"[DEBUG] Alternative URL 2 failed: {alt_response2.status_code}")
                     print(f"[DEBUG] Response: {alt_response2.text[:200]}")
                 
-                # Try 3: Matrix Client API endpoint (v3)
-                alt_url3 = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
-                print(f"[DEBUG] Trying alternative URL 3 (client v3): {alt_url3}")
-                alt_response3 = requests.get(alt_url3, stream=True, timeout=30, allow_redirects=True, headers=headers)
-                if alt_response3.status_code == 200:
-                    print(f"[DEBUG] ✅ Alternative URL 3 worked!")
-                    content_type = alt_response3.headers.get('Content-Type', 'application/octet-stream')
-                    def generate():
-                        for chunk in alt_response3.iter_content(chunk_size=8192):
-                            if chunk:
-                                yield chunk
-                    return Response(
-                        generate(),
-                        mimetype=content_type,
-                        headers={
-                            'Content-Disposition': f'inline; filename="{media_id}"',
-                            'Cache-Control': 'public, max-age=3600',
-                            'Access-Control-Allow-Origin': '*'
-                        }
-                    )
-                else:
-                    print(f"[DEBUG] Alternative URL 3 failed: {alt_response3.status_code}")
+                # Try 3: Matrix Client API endpoint (v3) - requires authentication
+                if admin_token:
+                    alt_url3 = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
+                    print(f"[DEBUG] Trying alternative URL 3 (client v3 with auth): {alt_url3}")
+                    alt_response3 = requests.get(alt_url3, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                    if alt_response3.status_code == 200:
+                        print(f"[DEBUG] ✅ Alternative URL 3 worked!")
+                        content_type = alt_response3.headers.get('Content-Type', 'application/octet-stream')
+                        def generate():
+                            for chunk in alt_response3.iter_content(chunk_size=8192):
+                                if chunk:
+                                    yield chunk
+                        return Response(
+                            generate(),
+                            mimetype=content_type,
+                            headers={
+                                'Content-Disposition': f'inline; filename="{media_id}"',
+                                'Cache-Control': 'public, max-age=3600',
+                                'Access-Control-Allow-Origin': '*'
+                            }
+                        )
+                    else:
+                        print(f"[DEBUG] Alternative URL 3 failed: {alt_response3.status_code}")
+                        print(f"[DEBUG] Response: {alt_response3.text[:200]}")
                 
-                # Try 4: Matrix Client API endpoint without server_name
-                alt_url4 = f'{synapse_url}/_matrix/client/v3/download/{media_id}'
-                print(f"[DEBUG] Trying alternative URL 4 (client v3, no server_name): {alt_url4}")
-                alt_response4 = requests.get(alt_url4, stream=True, timeout=30, allow_redirects=True, headers=headers)
-                if alt_response4.status_code == 200:
-                    print(f"[DEBUG] ✅ Alternative URL 4 worked!")
-                    content_type = alt_response4.headers.get('Content-Type', 'application/octet-stream')
+                # Try 4: Matrix Client API endpoint without server_name (v3)
+                if admin_token:
+                    alt_url4 = f'{synapse_url}/_matrix/client/v3/download/{media_id}'
+                    print(f"[DEBUG] Trying alternative URL 4 (client v3, no server_name): {alt_url4}")
+                    alt_response4 = requests.get(alt_url4, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                    if alt_response4.status_code == 200:
+                        print(f"[DEBUG] ✅ Alternative URL 4 worked!")
+                        content_type = alt_response4.headers.get('Content-Type', 'application/octet-stream')
+                        def generate():
+                            for chunk in alt_response4.iter_content(chunk_size=8192):
+                                if chunk:
+                                    yield chunk
+                        return Response(
+                            generate(),
+                            mimetype=content_type,
+                            headers={
+                                'Content-Disposition': f'inline; filename="{media_id}"',
+                                'Cache-Control': 'public, max-age=3600',
+                                'Access-Control-Allow-Origin': '*'
+                            }
+                        )
+                    else:
+                        print(f"[DEBUG] Alternative URL 4 failed: {alt_response4.status_code}")
+                
+                # Try 5: Media v1 endpoint (some Synapse configs)
+                alt_url5 = f'{synapse_url}/_matrix/media/v1/download/{server_name}/{media_id}'
+                print(f"[DEBUG] Trying alternative URL 5 (media v1): {alt_url5}")
+                alt_response5 = requests.get(alt_url5, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if alt_response5.status_code == 200:
+                    print(f"[DEBUG] ✅ Alternative URL 5 worked!")
+                    content_type = alt_response5.headers.get('Content-Type', 'application/octet-stream')
                     def generate():
-                        for chunk in alt_response4.iter_content(chunk_size=8192):
+                        for chunk in alt_response5.iter_content(chunk_size=8192):
                             if chunk:
                                 yield chunk
                     return Response(
@@ -3071,7 +3097,7 @@ def proxy_media_download(server_name, media_id):
                         }
                     )
                 else:
-                    print(f"[DEBUG] Alternative URL 4 failed: {alt_response4.status_code}")
+                    print(f"[DEBUG] Alternative URL 5 failed: {alt_response5.status_code}")
                 
                 # Try 3: Check if media is on a different server (federated)
                 if server_name != homeserver_domain:
