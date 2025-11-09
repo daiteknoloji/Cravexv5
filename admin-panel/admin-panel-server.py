@@ -2318,17 +2318,40 @@ def create_user():
                 api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
                 
                 print(f"[DEBUG] Calling Synapse API: {api_url}")
+                print(f"[DEBUG] User data: {user_data}")
                 response = requests.put(api_url, headers=headers, json=user_data, timeout=10)
-                print(f"[DEBUG] Synapse API response: {response.status_code} - {response.text[:100]}")
+                print(f"[DEBUG] Synapse API response: {response.status_code} - {response.text[:200]}")
                 
                 if response.status_code == 200 or response.status_code == 201:
+                    # Verify user was created correctly
+                    print(f"[INFO] User created via Matrix API. Verifying password...")
+                    # Test login to verify password works
+                    try:
+                        test_login = requests.post(
+                            f'{synapse_url}/_matrix/client/v3/login',
+                            json={
+                                'type': 'm.login.password',
+                                'identifier': {'type': 'm.id.user', 'user': username},
+                                'password': password
+                            },
+                            timeout=5
+                        )
+                        if test_login.status_code == 200:
+                            print(f"[INFO] Password verification successful!")
+                        else:
+                            print(f"[WARN] Password verification failed: {test_login.status_code} - {test_login.text[:100]}")
+                    except Exception as verify_error:
+                        print(f"[WARN] Could not verify password: {verify_error}")
+                    
                     return jsonify({
                         'success': True,
                         'user_id': user_id,
-                        'message': 'User created successfully via Matrix API!'
+                        'message': 'User created successfully via Matrix API!',
+                        'method': 'matrix_api'
                     })
                 else:
                     print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
+                    print(f"[WARN] Error details: {response.text[:200]}")
         except Exception as api_error:
             print(f"[INFO] Matrix API not available, using database fallback: {api_error}")
         
@@ -2347,11 +2370,15 @@ def create_user():
             return jsonify({'error': 'User already exists', 'success': False}), 409
         
         # Hash password (bcrypt with 12 rounds - same as Synapse)
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
-        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:20]}...")
+        # IMPORTANT: Use gensalt(rounds=12) to match Synapse's default
+        salt = bcrypt.gensalt(rounds=12)
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:30]}...")
+        print(f"[DEBUG] Password hash length: {len(password_hash)}, starts with: {password_hash[:7]}")
         
         # Insert user (with all required columns)
-        creation_ts = int(time.time())  # Synapse uses SECONDS, not milliseconds
+        # Synapse uses milliseconds for creation_ts
+        creation_ts = int(time.time() * 1000)  # Convert to milliseconds
         
         # Check which columns exist in users table
         cur.execute("""
