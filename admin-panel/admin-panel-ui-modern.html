@@ -76,25 +76,148 @@
         /* Layout */
         .app-container {
             display: flex;
+            flex-direction: column;
             height: 100vh;
         }
         
-        /* Sidebar Navigation - Modern Sliderbar Style */
-        .sidebar {
-            width: 80px;
-            background: var(--sidebar-bg);
-            border-right: 1px solid rgba(255, 255, 255, 0.08);
+        /* Top Tab Navigation */
+        .top-nav {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
-            flex-direction: column;
-            padding: 16px 0;
-            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: visible;
+            align-items: center;
+            padding: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         
-        .sidebar:hover {
-            width: 260px;
+        .top-nav::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .top-nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            flex-shrink: 0;
+            min-width: 180px;
+        }
+        
+        .top-nav-logo img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+        
+        .top-nav-logo h1 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            margin: 0;
+        }
+        
+        .top-nav-tabs {
+            display: flex;
+            flex: 1;
+            gap: 4px;
+            padding: 8px 12px;
+            overflow-x: auto;
+        }
+        
+        .top-nav-tab {
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            border: 1px solid transparent;
+        }
+        
+        .top-nav-tab:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        .top-nav-tab.active {
+            background: rgba(13, 189, 139, 0.15);
+            color: var(--accent-green);
+            border-color: rgba(13, 189, 139, 0.3);
+        }
+        
+        .top-nav-tab i {
+            font-size: 16px;
+        }
+        
+        .top-nav-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            border-left: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        
+        .top-nav-user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
+        .top-nav-user-info {
+            display: none;
+        }
+        
+        .top-nav-user-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .top-nav-logout {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+            background: transparent;
+            border: none;
+        }
+        
+        .top-nav-logout:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+        }
+        
+        /* Sidebar - Removed, replaced with top nav */
+        .sidebar {
+            display: none;
         }
         
         .sidebar-header {
@@ -455,21 +578,23 @@
             animation: fadeIn 0.4s ease-in-out;
         }
         
-        /* Header */
+        /* Header - Simplified */
         .header {
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
-            padding: 0 32px;
-            height: 70px;
+            padding: 16px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
         }
         
         .header-title {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 600;
             color: var(--text-primary);
+            margin: 0;
         }
         
         .header-actions {
@@ -482,44 +607,102 @@
         .content {
             flex: 1;
             overflow-y: auto;
-            padding: 32px;
+            padding: 20px;
             transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        /* Mobile Menu Toggle */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 16px;
-            left: 16px;
-            z-index: 1001;
-            width: 44px;
-            height: 44px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--text-primary);
-            font-size: 20px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .mobile-menu-toggle:hover {
-            background: var(--bg-tertiary);
-            transform: scale(1.05);
-        }
-        
+        /* Responsive Design */
         @media (max-width: 768px) {
-            .mobile-menu-toggle {
-                display: flex;
+            .top-nav {
+                flex-wrap: wrap;
             }
             
-            .main-content {
-                margin-left: 0;
+            .top-nav-logo {
+                min-width: auto;
+                padding: 10px 16px;
+                flex: 1;
+            }
+            
+            .top-nav-logo h1 {
+                font-size: 14px;
+            }
+            
+            .top-nav-tabs {
+                order: 3;
+                width: 100%;
+                padding: 8px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .top-nav-tab {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+            
+            .top-nav-tab span {
+                display: none;
+            }
+            
+            .top-nav-user {
+                order: 2;
+                padding: 8px 12px;
+            }
+            
+            .top-nav-user-info {
+                display: none;
+            }
+            
+            .content {
+                padding: 12px;
+            }
+            
+            .header {
+                padding: 12px 16px;
+            }
+            
+            .header-title {
+                font-size: 18px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .card-body {
+                padding: 16px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .top-nav-logo {
+                padding: 8px 12px;
+            }
+            
+            .top-nav-logo h1 {
+                font-size: 12px;
+            }
+            
+            .top-nav-tab {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            
+            .top-nav-tab i {
+                font-size: 14px;
+            }
+            
+            .content {
+                padding: 8px;
+            }
+            
+            .header {
+                padding: 8px 12px;
+            }
+            
+            .header-title {
+                font-size: 16px;
             }
         }
         
@@ -1077,59 +1260,44 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Mobile Menu Toggle -->
-        <button class="mobile-menu-toggle" onclick="toggleMobileSidebar()" id="mobileMenuToggle">
-            <i class="fas fa-bars"></i>
-        </button>
-        
-        <!-- Sidebar Navigation -->
-        <div class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <img src="/static/1.svg" alt="Cravex Logo" onerror="this.style.display='none'">
-                    <div class="logo-text">
-                        <h1>Cravex Admin</h1>
-                        <p>Professional Panel</p>
-                    </div>
-                </div>
+        <!-- Top Tab Navigation -->
+        <div class="top-nav">
+            <div class="top-nav-logo">
+                <img src="/static/1.svg" alt="Cravex Logo" onerror="this.style.display='none'">
+                <h1>Cravex Admin</h1>
             </div>
-            
-            <nav class="nav-menu">
-                <div class="nav-item active" onclick="showPage('dashboard')" style="--item-index: 0" data-tooltip="Dashboard">
+            <div class="top-nav-tabs">
+                <div class="top-nav-tab active" onclick="showPage('dashboard')">
                     <i class="fas fa-home"></i>
                     <span>Dashboard</span>
                 </div>
-                <div class="nav-item" onclick="showPage('rooms')" style="--item-index: 1" data-tooltip="Odalar">
+                <div class="top-nav-tab" onclick="showPage('rooms')">
                     <i class="fas fa-door-open"></i>
                     <span>Odalar</span>
                 </div>
-                <div class="nav-item" onclick="showPage('users')" style="--item-index: 2" data-tooltip="Kullanıcılar">
+                <div class="top-nav-tab" onclick="showPage('users')">
                     <i class="fas fa-users"></i>
                     <span>Kullanıcılar</span>
                 </div>
-                <div class="nav-item" onclick="showPage('deleted-users')" style="--item-index: 3" data-tooltip="Silinen Kullanıcılar">
+                <div class="top-nav-tab" onclick="showPage('deleted-users')">
                     <i class="fas fa-user-slash"></i>
-                    <span>Silinen Kullanıcılar</span>
+                    <span>Silinen</span>
                 </div>
-                <div class="nav-item" onclick="showPage('messages')" style="--item-index: 4" data-tooltip="Mesajlar">
+                <div class="top-nav-tab" onclick="showPage('messages')">
                     <i class="fas fa-comments"></i>
                     <span>Mesajlar</span>
                 </div>
-            </nav>
-            
-            <div class="sidebar-footer">
-                <div class="user-profile">
-                    <div class="user-avatar">A</div>
-                    <div class="user-info">
-                        <div class="user-name">Administrator</div>
-                        <div class="user-role">Server Admin</div>
-                    </div>
-                    <form action="/logout" method="POST" style="margin: 0;">
-                        <button type="submit" class="logout-icon" title="Çıkış Yap">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </form>
+            </div>
+            <div class="top-nav-user">
+                <div class="top-nav-user-avatar">A</div>
+                <div class="top-nav-user-info">
+                    <div class="top-nav-user-name">Administrator</div>
                 </div>
+                <form action="/logout" method="POST" style="margin: 0;">
+                    <button type="submit" class="top-nav-logout" title="Çıkış Yap">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </form>
             </div>
         </div>
         
@@ -1673,29 +1841,14 @@
         loadStats();
         
         // Page Navigation
-        function toggleMobileSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('mobile-visible');
-        }
-        
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', function(event) {
-            const sidebar = document.getElementById('sidebar');
-            const toggle = document.getElementById('mobileMenuToggle');
-            if (window.innerWidth <= 768 && sidebar && toggle && !sidebar.contains(event.target) && !toggle.contains(event.target)) {
-                sidebar.classList.remove('mobile-visible');
-            }
-        });
-        
         function showPage(pageName) {
-            // Update navigation
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            // Find and activate the correct nav item
-            const navItems = document.querySelectorAll('.nav-item');
-            navItems.forEach(item => {
-                const onclick = item.getAttribute('onclick');
+            // Update top navigation tabs
+            document.querySelectorAll('.top-nav-tab').forEach(tab => tab.classList.remove('active'));
+            const tabs = document.querySelectorAll('.top-nav-tab');
+            tabs.forEach(tab => {
+                const onclick = tab.getAttribute('onclick');
                 if (onclick && onclick.includes(`'${pageName}'`)) {
-                    item.classList.add('active');
+                    tab.classList.add('active');
                 }
             });
             
@@ -1721,16 +1874,11 @@
             
             currentPage = pageName;
             
-            // Close mobile sidebar when navigating
-            if (window.innerWidth <= 768) {
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar) sidebar.classList.remove('mobile-visible');
-            }
-            
             // Load page data
             if (pageName === 'rooms') loadRooms();
             if (pageName === 'users') loadUsers();
             if (pageName === 'deleted-users') loadDeletedUsers();
+            if (pageName === 'messages') searchMessages();
         }
         
         function loadCurrentPage() {
@@ -2409,24 +2557,9 @@
                     const userIdFilter = document.getElementById('filterUserId').value.toLowerCase();
                     if (userIdFilter && !user.user_id.toLowerCase().includes(userIdFilter)) return false;
                     
-                    // Display name filter
-                    const displayNameFilter = document.getElementById('filterDisplayName').value.toLowerCase();
-                    if (displayNameFilter && !(user.displayname || '').toLowerCase().includes(displayNameFilter)) return false;
-                    
                     // Role filter
                     if (roleFilter === 'admin' && !user.admin) return false;
                     if (roleFilter === 'user' && user.admin) return false;
-                    if (roleFilter === 'locked' && !user.locked) return false;
-                    if (roleFilter === 'banned' && !user.shadow_banned) return false;
-                    if (roleFilter === 'deactivated' && !user.deactivated) return false;
-                    
-                    // Min rooms filter
-                    const minRooms = parseInt(document.getElementById('filterMinRooms').value) || 0;
-                    if (user.room_count < minRooms) return false;
-                    
-                    // Min sessions filter
-                    const minSessions = parseInt(document.getElementById('filterMinSessions').value) || 0;
-                    if (user.active_sessions < minSessions) return false;
                     
                     return true;
                 });
