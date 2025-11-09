@@ -2863,30 +2863,26 @@ def create_user():
         cur.execute("SELECT name, password_hash FROM users WHERE name = %s", (user_id,))
         existing_user = cur.fetchone()
         if existing_user:
-            # User exists - check if password needs to be updated
+            # User exists - always update password hash to ensure it works
             existing_hash = existing_user[1]
             print(f"[INFO] User {user_id} already exists in database")
             print(f"[INFO] Existing password hash: {existing_hash[:30] if existing_hash else 'NULL'}...")
+            print(f"[INFO] Updating password hash to ensure login works...")
             
-            # If password hash is NULL or empty, update it
-            if not existing_hash:
-                print(f"[INFO] User exists but has no password hash. Updating password...")
-                salt = bcrypt.gensalt(rounds=12)
-                password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
-                cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
-                conn.commit()
-                cur.close()
-                conn.close()
-                return jsonify({
-                    'success': True,
-                    'user_id': user_id,
-                    'message': 'User already exists - password hash updated!',
-                    'method': 'database_update'
-                })
-            else:
-                cur.close()
-                conn.close()
-                return jsonify({'error': 'User already exists', 'success': False}), 409
+            # Always update password hash (user might have been created via Matrix API but password doesn't work)
+            salt = bcrypt.gensalt(rounds=12)
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+            cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"[INFO] Password hash updated successfully!")
+            return jsonify({
+                'success': True,
+                'user_id': user_id,
+                'message': 'User already exists - password hash updated!',
+                'method': 'database_update'
+            })
         
         # Hash password (bcrypt with 12 rounds - same as Synapse)
         # IMPORTANT: Use gensalt(rounds=12) to match Synapse's default
