@@ -1626,23 +1626,36 @@ def remove_room_member(room_id, user_id):
 @app.route('/api/users')
 @login_required
 def get_users():
-    """Get all users with extended info"""
+    """Get all users with extended info (excluding deleted users)"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Check if shadow_banned and locked columns exist (may not exist in older Synapse versions)
+        # Check if shadow_banned, locked, and deleted columns exist
         cur.execute("""
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name IN ('shadow_banned', 'locked')
+            WHERE table_name = 'users' AND column_name IN ('shadow_banned', 'locked', 'deleted')
         """)
         existing_cols = [row[0] for row in cur.fetchall()]
         has_shadow_banned = 'shadow_banned' in existing_cols
         has_locked = 'locked' in existing_cols
+        has_deleted = 'deleted' in existing_cols
+        
+        # Add deleted column if it doesn't exist
+        if not has_deleted:
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted smallint DEFAULT 0")
+                conn.commit()
+                print("[INFO] Added 'deleted' column to users table")
+                has_deleted = True
+            except Exception as col_error:
+                print(f"[WARN] Could not add deleted column: {col_error}")
+                conn.rollback()
         
         shadow_col = 'u.shadow_banned' if has_shadow_banned else 'false as shadow_banned'
         locked_col = 'u.locked' if has_locked else 'false as locked'
+        deleted_col = 'u.deleted' if has_deleted else '0 as deleted'
         
         query = f"""
             SELECT 
@@ -1655,8 +1668,10 @@ def get_users():
                  WHERE user_id = u.name AND membership = 'join') as room_count,
                 (SELECT COUNT(*) FROM access_tokens WHERE user_id = u.name) as token_count,
                 {shadow_col},
-                {locked_col}
+                {locked_col},
+                {deleted_col}
             FROM users u
+            WHERE ({deleted_col} = 0 OR {deleted_col} IS NULL)
             ORDER BY u.admin DESC, u.deactivated ASC, u.name;
         """
         
@@ -1686,7 +1701,8 @@ def get_users():
                 'room_count': row[5] or 0,
                 'active_sessions': row[6] or 0,
                 'shadow_banned': bool(row[7]) if row[7] is not None else False,
-                'locked': bool(row[8]) if row[8] is not None else False
+                'locked': bool(row[8]) if row[8] is not None else False,
+                'deleted': bool(row[9]) if len(row) > 9 and row[9] is not None else False
             })
         
         cur.close()
@@ -1696,6 +1712,104 @@ def get_users():
         
     except Exception as e:
         print(f"[HATA] /api/users - {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'details': traceback.format_exc()}), 500
+
+@app.route('/api/users/deleted')
+@login_required
+def get_deleted_users():
+    """Get all deleted users"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check if deleted column exists, if not add it
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'deleted'
+        """)
+        has_deleted_col = cur.fetchone() is not None
+        
+        if not has_deleted_col:
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted smallint DEFAULT 0")
+                conn.commit()
+                print("[INFO] Added 'deleted' column to users table")
+                has_deleted_col = True
+            except Exception as col_error:
+                print(f"[WARN] Could not add deleted column: {col_error}")
+                conn.rollback()
+        
+        # Check other columns
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name IN ('shadow_banned', 'locked')
+        """)
+        existing_cols = [row[0] for row in cur.fetchall()]
+        has_shadow_banned = 'shadow_banned' in existing_cols
+        has_locked = 'locked' in existing_cols
+        
+        shadow_col = 'u.shadow_banned' if has_shadow_banned else 'false as shadow_banned'
+        locked_col = 'u.locked' if has_locked else 'false as locked'
+        deleted_col = 'u.deleted' if has_deleted_col else '0 as deleted'
+        
+        query = f"""
+            SELECT 
+                u.name,
+                u.admin,
+                u.deactivated,
+                u.creation_ts,
+                (SELECT displayname FROM profiles WHERE user_id = u.name LIMIT 1) as displayname,
+                (SELECT COUNT(DISTINCT room_id) FROM room_memberships 
+                 WHERE user_id = u.name AND membership = 'join') as room_count,
+                (SELECT COUNT(*) FROM access_tokens WHERE user_id = u.name) as token_count,
+                {shadow_col},
+                {locked_col},
+                {deleted_col}
+            FROM users u
+            WHERE {deleted_col} = 1
+            ORDER BY u.creation_ts DESC;
+        """
+        
+        cur.execute(query)
+        rows = cur.fetchall()
+        
+        users = []
+        for row in rows:
+            # Handle timestamp
+            created_str = ''
+            if row[3]:
+                try:
+                    if row[3] > 10000000000:  # Milliseconds
+                        created_str = datetime.fromtimestamp(row[3] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                    else:  # Seconds
+                        created_str = datetime.fromtimestamp(row[3]).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception as ts_err:
+                    created_str = str(row[3])
+            
+            users.append({
+                'user_id': row[0],
+                'admin': bool(row[1]),
+                'deactivated': bool(row[2]),
+                'created': created_str,
+                'displayname': row[4],
+                'room_count': row[5] or 0,
+                'active_sessions': row[6] or 0,
+                'shadow_banned': bool(row[7]) if row[7] is not None else False,
+                'locked': bool(row[8]) if row[8] is not None else False,
+                'deleted': True
+            })
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({'users': users, 'total': len(users)})
+        
+    except Exception as e:
+        print(f"[HATA] /api/users/deleted - {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e), 'details': traceback.format_exc()}), 500
@@ -1947,28 +2061,47 @@ def delete_user(user_id):
         """, (user_id,))
         profiles_deleted = cur.rowcount
         
-        # Actually delete user from users table
+        # Check if deleted column exists, if not add it
         cur.execute("""
-            DELETE FROM users WHERE name = %s
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'deleted'
+        """)
+        has_deleted_col = cur.fetchone() is not None
+        
+        if not has_deleted_col:
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted smallint DEFAULT 0")
+                conn.commit()
+                print("[INFO] Added 'deleted' column to users table")
+            except Exception as col_error:
+                print(f"[WARN] Could not add deleted column: {col_error}")
+                conn.rollback()
+        
+        # Mark user as deleted instead of actually deleting (so we can show deleted users)
+        cur.execute("""
+            UPDATE users 
+            SET deleted = 1, deactivated = 1 
+            WHERE name = %s
         """, (user_id,))
-        user_deleted = cur.rowcount
+        user_marked_deleted = cur.rowcount
         
         conn.commit()
         cur.close()
         conn.close()
         
-        print(f"[INFO] User completely deleted: {user_id} - user: {user_deleted}, tokens: {tokens_deleted}, devices: {devices_deleted}, memberships: {memberships_deleted}, matrix_api: {matrix_api_success}")
+        print(f"[INFO] User marked as deleted: {user_id} - user: {user_marked_deleted}, tokens: {tokens_deleted}, devices: {devices_deleted}, memberships: {memberships_deleted}, matrix_api: {matrix_api_success}")
         
         msg = f'Kullanıcı başarıyla silindi: {user_id}'
         if matrix_api_success:
             msg += ' - Aktif oturumlar kapatıldı (Matrix API)'
         else:
-            msg += ' - Veritabanından silindi (Matrix API kullanılamadı)'
+            msg += ' - Sistemden kaldırıldı (Matrix API kullanılamadı)'
         
         return jsonify({
             'success': True,
             'message': msg,
-            'user_deleted': user_deleted > 0,
+            'user_deleted': user_marked_deleted > 0,
             'tokens_deleted': tokens_deleted,
             'devices_deleted': devices_deleted,
             'memberships_deleted': memberships_deleted,

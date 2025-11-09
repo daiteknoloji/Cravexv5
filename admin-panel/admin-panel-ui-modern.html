@@ -856,7 +856,11 @@
                     <i class="fas fa-users"></i>
                     <span>Kullanıcılar</span>
                 </div>
-                <div class="nav-item" onclick="showPage('messages')" style="--item-index: 3">
+                <div class="nav-item" onclick="showPage('deleted-users')" style="--item-index: 3">
+                    <i class="fas fa-user-slash"></i>
+                    <span>Silinen Kullanıcılar</span>
+                </div>
+                <div class="nav-item" onclick="showPage('messages')" style="--item-index: 4">
                     <i class="fas fa-comments"></i>
                     <span>Mesajlar</span>
                 </div>
@@ -1114,6 +1118,42 @@
                                 Sayfa <strong id="usersCurrentPage">1</strong> / <strong id="usersTotalPages">1</strong>
                             </span>
                             <button class="btn btn-secondary" id="usersNextBtn" onclick="nextUsersPage()" disabled>
+                                Sonraki <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Deleted Users Page -->
+                <div class="page-view" id="page-deleted-users">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fas fa-user-slash"></i>
+                                Silinen Kullanıcılar
+                            </div>
+                        </div>
+                        <div class="card-body" id="deletedUsersContent">
+                            <div class="loading">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <div class="loading-text">Silinen kullanıcılar yükleniyor...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="flex-between mt-3">
+                        <div class="pagination-info" id="deletedUsersPaginationInfo">
+                            <span id="deletedUsersShowingText">0 kullanıcı gösteriliyor</span>
+                        </div>
+                        <div class="pagination">
+                            <button class="btn btn-secondary" id="deletedUsersPrevBtn" onclick="previousDeletedUsersPage()" disabled>
+                                <i class="fas fa-chevron-left"></i> Önceki
+                            </button>
+                            <span class="pagination-info">
+                                Sayfa <strong id="deletedUsersCurrentPage">1</strong> / <strong id="deletedUsersTotalPages">1</strong>
+                            </span>
+                            <button class="btn btn-secondary" id="deletedUsersNextBtn" onclick="nextDeletedUsersPage()" disabled>
                                 Sonraki <i class="fas fa-chevron-right"></i>
                             </button>
                         </div>
@@ -1441,6 +1481,7 @@
                 'dashboard': 'Dashboard',
                 'rooms': 'Oda Yönetimi',
                 'users': 'Kullanıcı Yönetimi',
+                'deleted-users': 'Silinen Kullanıcılar',
                 'messages': 'Mesaj Görüntüleme'
             };
             document.getElementById('pageTitle').textContent = titles[pageName] || pageName;
@@ -1450,12 +1491,14 @@
             // Load page data
             if (pageName === 'rooms') loadRooms();
             if (pageName === 'users') loadUsers();
+            if (pageName === 'deleted-users') loadDeletedUsers();
         }
         
         function loadCurrentPage() {
             if (currentPage === 'dashboard') loadStats();
             if (currentPage === 'rooms') loadRooms();
             if (currentPage === 'users') loadUsers();
+            if (currentPage === 'deleted-users') loadDeletedUsers();
             if (currentPage === 'messages') searchMessages();
         }
         
@@ -2163,6 +2206,87 @@
             document.getElementById('filterMinRooms').value = '';
             document.getElementById('filterMinSessions').value = '';
             loadUsers();
+        }
+        
+        // Deleted Users Management
+        let currentDeletedUsersPage = 1;
+        const deletedUsersPerPage = 10;
+        let deletedUsers = [];
+        
+        async function loadDeletedUsers() {
+            const container = document.getElementById('deletedUsersContent');
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><div class="loading-text">Silinen kullanıcılar yükleniyor...</div></div>';
+            
+            try {
+                const response = await fetch('/api/users/deleted');
+                const data = await response.json();
+                
+                deletedUsers = data.users || [];
+                currentDeletedUsersPage = 1;
+                renderDeletedUsersPage();
+                
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-circle"></i><div class="empty-text">Hata: ${error.message}</div></div>`;
+            }
+        }
+        
+        function renderDeletedUsersPage() {
+            const container = document.getElementById('deletedUsersContent');
+            const totalPages = Math.ceil(deletedUsers.length / deletedUsersPerPage);
+            const startIndex = (currentDeletedUsersPage - 1) * deletedUsersPerPage;
+            const endIndex = startIndex + deletedUsersPerPage;
+            const pageUsers = deletedUsers.slice(startIndex, endIndex);
+            
+            if (deletedUsers.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><div class="empty-text">Silinen kullanıcı bulunamadı</div></div>';
+                document.getElementById('deletedUsersShowingText').textContent = '0 kullanıcı gösteriliyor';
+                document.getElementById('deletedUsersCurrentPage').textContent = '0';
+                document.getElementById('deletedUsersTotalPages').textContent = '0';
+                document.getElementById('deletedUsersPrevBtn').disabled = true;
+                document.getElementById('deletedUsersNextBtn').disabled = true;
+                return;
+            }
+            
+            let html = '<table><thead><tr><th>Kullanıcı ID</th><th>Görünen Ad</th><th>Roller</th><th>Odalar</th><th>Oluşturulma</th></tr></thead><tbody>';
+            
+            pageUsers.forEach(user => {
+                const adminBadge = user.admin ? '<span class="badge badge-info"><i class="fas fa-crown"></i> Admin</span>' : '<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">Kullanıcı</span>';
+                const deletedBadge = '<span class="badge badge-danger" style="margin-left: 4px;"><i class="fas fa-trash"></i> Silindi</span>';
+                html += `
+                    <tr>
+                        <td style="font-family: monospace; color: var(--accent-blue); font-weight: 500;">${user.user_id}</td>
+                        <td>${user.displayname || '<em style="color: var(--text-muted);">Yok</em>'}</td>
+                        <td>${adminBadge}${deletedBadge}</td>
+                        <td><span class="badge badge-success">${user.room_count} oda</span></td>
+                        <td style="color: var(--text-muted); font-size: 13px;">${user.created || 'Bilinmiyor'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            
+            // Update pagination info
+            document.getElementById('deletedUsersShowingText').textContent = `${startIndex + 1}-${Math.min(endIndex, deletedUsers.length)} / ${deletedUsers.length} kullanıcı`;
+            document.getElementById('deletedUsersCurrentPage').textContent = currentDeletedUsersPage;
+            document.getElementById('deletedUsersTotalPages').textContent = totalPages || 1;
+            document.getElementById('deletedUsersPrevBtn').disabled = currentDeletedUsersPage === 1;
+            document.getElementById('deletedUsersNextBtn').disabled = currentDeletedUsersPage >= totalPages;
+        }
+        
+        function nextDeletedUsersPage() {
+            const totalPages = Math.ceil(deletedUsers.length / deletedUsersPerPage);
+            if (currentDeletedUsersPage < totalPages) {
+                currentDeletedUsersPage++;
+                renderDeletedUsersPage();
+            }
+        }
+        
+        function previousDeletedUsersPage() {
+            if (currentDeletedUsersPage > 1) {
+                currentDeletedUsersPage--;
+                renderDeletedUsersPage();
+            }
         }
         
         // User Details Modal
