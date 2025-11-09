@@ -2948,6 +2948,14 @@ def create_user():
         
         cur.execute(insert_query, tuple(params))
         
+        # Verify password hash was inserted correctly
+        cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
+        verify_row = cur.fetchone()
+        if verify_row:
+            verify_hash = verify_row[0]
+            print(f"[DEBUG] Verified password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
+            print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
+        
         # Create profile (required for Matrix)
         display_name_value = displayname if displayname else username
         cur.execute("""
@@ -2971,6 +2979,15 @@ def create_user():
             VALUES (%s, %s)
             ON CONFLICT (user_id) DO UPDATE SET vector = EXCLUDED.vector
         """, (user_id, search_vector))
+        
+        # CRITICAL: Verify password works by testing with bcrypt.checkpw
+        import bcrypt
+        test_check = bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+        print(f"[DEBUG] Password verification test (bcrypt.checkpw): {test_check}")
+        if not test_check:
+            print(f"[ERROR] Password hash verification FAILED! This is a critical error!")
+        else:
+            print(f"[INFO] Password hash verification PASSED!")
         
         conn.commit()
         cur.close()
