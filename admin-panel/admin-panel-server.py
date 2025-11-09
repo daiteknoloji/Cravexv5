@@ -1208,6 +1208,25 @@ def get_messages():
             if media_url:
                 print(f"[DEBUG] Message {row[14]}: MXC URL = {media_url}, Parsed HTTP URL = {media_http_url}")
             
+            # Get sender's access token for media access (if available)
+            sender_token = None
+            if sender and media_url:
+                try:
+                    conn_token = get_db_connection()
+                    cur_token = conn_token.cursor()
+                    cur_token.execute(
+                        "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                        (sender,)
+                    )
+                    token_row = cur_token.fetchone()
+                    sender_token = token_row[0] if token_row else None
+                    cur_token.close()
+                    conn_token.close()
+                    if sender_token:
+                        print(f"[DEBUG] Found token for sender {sender}: {sender_token[:20]}...")
+                except Exception as token_err:
+                    print(f"[DEBUG] Could not get sender token: {token_err}")
+            
             messages.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
                 'sender': sender,
@@ -1228,6 +1247,7 @@ def get_messages():
                 'is_deleted': is_deleted,
                 'deleted_by': row[13] if is_deleted else None,
                 'event_id': row[14],
+                'sender_token_available': sender_token is not None,  # For debugging
                 # Debug info
                 'debug': {
                     'mxc_url': media_url,
