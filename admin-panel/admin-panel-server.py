@@ -1399,17 +1399,48 @@ def get_room_messages(room_id):
         
         messages = []
         for row in rows:
-            is_deleted = row[5] is not None  # redacted_by exists
+            is_deleted = row[11] is not None  # redacted_by exists
+            
+            # Extract media/file information
+            msgtype = row[3] if len(row) > 3 else None
+            media_url = row[4] if len(row) > 4 else None
+            mimetype = row[5] if len(row) > 5 else None
+            file_size = row[6] if len(row) > 6 else None
+            image_width = row[7] if len(row) > 7 else None
+            image_height = row[8] if len(row) > 8 else None
+            thumbnail_url = row[9] if len(row) > 9 else None
+            
+            # Convert MXC URL to HTTP URL if needed
+            media_http_url = None
+            thumbnail_http_url = None
+            homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'matrix-synapse.up.railway.app')
+            synapse_url = os.getenv('SYNAPSE_URL', f'https://{homeserver_domain}')
+            
+            if media_url and media_url.startswith('mxc://'):
+                mxc_path = media_url.replace('mxc://', '')
+                media_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
+            
+            if thumbnail_url and thumbnail_url.startswith('mxc://'):
+                mxc_path = thumbnail_url.replace('mxc://', '')
+                thumbnail_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
             
             messages.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
                 'sender': row[1],
                 'message': row[2] or '',
-                'msgtype': row[3] or 'm.text',
-                'event_id': row[4],
+                'msgtype': msgtype or 'm.text',
+                'media_url': media_url,
+                'media_http_url': media_http_url,
+                'thumbnail_url': thumbnail_url,
+                'thumbnail_http_url': thumbnail_http_url,
+                'mimetype': mimetype,
+                'file_size': int(file_size) if file_size else None,
+                'image_width': int(image_width) if image_width else None,
+                'image_height': int(image_height) if image_height else None,
+                'event_id': row[10],
                 'is_deleted': is_deleted,
-                'deleted_by': row[5] if is_deleted else None,
-                'deleted_at': row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] else None
+                'deleted_by': row[11] if is_deleted else None,
+                'deleted_at': row[12].strftime('%Y-%m-%d %H:%M:%S') if row[12] else None
             })
         
         cur.close()
