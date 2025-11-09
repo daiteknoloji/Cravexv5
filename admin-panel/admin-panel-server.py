@@ -1204,6 +1204,10 @@ def get_messages():
                 if msgtype == 'm.image':
                     thumbnail_http_url = mxc_to_http(media_url, use_thumbnail=True)
             
+            # Debug: Log MXC URL information
+            if media_url:
+                print(f"[DEBUG] Message {row[14]}: MXC URL = {media_url}, Parsed HTTP URL = {media_http_url}")
+            
             messages.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
                 'sender': sender,
@@ -1211,10 +1215,10 @@ def get_messages():
                 'room_name': room_name,
                 'message': row[4],
                 'msgtype': msgtype,
-                'media_url': media_url,
-                'media_http_url': media_http_url,
-                'thumbnail_url': thumbnail_url,
-                'thumbnail_http_url': thumbnail_http_url,
+                'media_url': media_url,  # Original MXC URL
+                'media_http_url': media_http_url,  # Parsed proxy URL
+                'thumbnail_url': thumbnail_url,  # Original MXC thumbnail URL
+                'thumbnail_http_url': thumbnail_http_url,  # Parsed proxy thumbnail URL
                 'mimetype': mimetype,
                 'file_size': int(file_size) if file_size else None,
                 'image_width': int(image_width) if image_width else None,
@@ -1223,7 +1227,13 @@ def get_messages():
                 'recipient_list': recipient_full_list,
                 'is_deleted': is_deleted,
                 'deleted_by': row[13] if is_deleted else None,
-                'event_id': row[14]
+                'event_id': row[14],
+                # Debug info
+                'debug': {
+                    'mxc_url': media_url,
+                    'parsed_server_name': media_url.split('/')[2] if media_url and '/' in media_url.replace('mxc://', '') else None,
+                    'parsed_media_id': media_url.split('/')[-1] if media_url and '/' in media_url.replace('mxc://', '') else None
+                } if media_url else None
             })
         
         cur.close()
