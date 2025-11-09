@@ -2026,11 +2026,14 @@ def add_room_member(room_id):
                         'suggestion': 'Mevcut oda üyelerinden birinin Element Web üzerinden kullanıcıyı davet etmesi gerekiyor.'
                     }), 403
             else:
+                # All methods failed - return error
+                error_status = admin_api_response.status_code if admin_api_response else 500
+                error_details = admin_api_response.text[:200] if admin_api_response else 'Unknown error'
                 return jsonify({
-                    'error': f'Matrix API hatası: {admin_api_response.status_code}',
+                    'error': f'Matrix API hatası: {error_status}',
                     'success': False,
-                    'details': admin_api_response.text[:200]
-                }), admin_api_response.status_code
+                    'details': error_details
+                }), error_status
                 
         except Exception as api_error:
             print(f"Matrix API error: {api_error}")
