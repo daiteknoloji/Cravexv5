@@ -12,6 +12,7 @@ BEGIN;
 -- 1. Bağımlı tabloları sil (events'e referans verenler)
 -- Not: Olmayan tablolar hata vermez, sadece atlanır
 DELETE FROM local_current_membership; -- ÖNCE BU! events'e referans veriyor
+DELETE FROM sliding_sync_membership_snapshots; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM current_state_events;
 DELETE FROM event_edges;
 DELETE FROM event_auth;
@@ -139,6 +140,7 @@ BEGIN;
 -- 1. Bağımlı tabloları sil (events'e referans verenler)
 -- Not: Olmayan tablolar hata vermez, sadece atlanır
 DELETE FROM local_current_membership; -- ÖNCE BU! events'e referans veriyor
+DELETE FROM sliding_sync_membership_snapshots; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM current_state_events;
 DELETE FROM event_edges;
 DELETE FROM event_auth;
