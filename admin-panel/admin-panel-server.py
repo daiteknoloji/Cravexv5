@@ -2915,21 +2915,68 @@ def proxy_media_download(server_name, media_id):
         print(f"[DEBUG] Homeserver domain: {homeserver_domain}")
         print(f"[DEBUG] Primary URL: {media_url}")
         
-        # Try to get admin token for authentication
-        admin_token = None
+        # Try to get sender's token from the media event
+        # First, find which event contains this media_id
+        sender_token = None
         try:
             conn = get_db_connection()
             cur = conn.cursor()
-            cur.execute(
-                "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
-                (ADMIN_USER_ID,)
-            )
-            token_row = cur.fetchone()
-            admin_token = token_row[0] if token_row else None
+            
+            # Find the event that contains this media_id
+            # Search in event_json content for the media_id
+            cur.execute("""
+                SELECT sender 
+                FROM events 
+                WHERE jsonb_typeof(event_json) = 'object' 
+                AND (
+                    event_json->'content'->>'url' LIKE %s 
+                    OR event_json->'content'->'info'->>'thumbnail_url' LIKE %s
+                )
+                ORDER BY stream_ordering DESC 
+                LIMIT 1
+            """, (f'%{media_id}%', f'%{media_id}%'))
+            
+            sender_row = cur.fetchone()
+            if sender_row:
+                sender = sender_row[0]
+                print(f"[DEBUG] Found sender for media {media_id}: {sender}")
+                
+                # Get sender's token
+                cur.execute(
+                    "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                    (sender,)
+                )
+                token_row = cur.fetchone()
+                if token_row:
+                    sender_token = token_row[0]
+                    print(f"[DEBUG] Found token for sender {sender}: {sender_token[:20]}...")
+            
+            # Fallback: Try admin token
+            if not sender_token:
+                cur.execute(
+                    "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                    (ADMIN_USER_ID,)
+                )
+                token_row = cur.fetchone()
+                sender_token = token_row[0] if token_row else None
+                if sender_token:
+                    print(f"[DEBUG] Using admin token as fallback")
+            
+            # Fallback 2: Try any active user token
+            if not sender_token:
+                cur.execute(
+                    "SELECT token, user_id FROM access_tokens WHERE id IN (SELECT MAX(id) FROM access_tokens GROUP BY user_id) ORDER BY id DESC LIMIT 1"
+                )
+                any_token_row = cur.fetchone()
+                if any_token_row:
+                    sender_token = any_token_row[0]
+                    print(f"[DEBUG] Using token from user {any_token_row[1]} for media access")
+            
             cur.close()
             conn.close()
         except Exception as token_error:
-            print(f"[WARN] Could not get admin token: {token_error}")
+            print(f"[WARN] Could not get sender token: {token_error}")
+            sender_token = None
         
         # Forward request to Matrix Synapse with headers
         headers = {
