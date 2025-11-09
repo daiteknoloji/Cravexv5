@@ -3014,7 +3014,7 @@ def create_user():
         if has_approved:
             base_cols += ", approved"
             base_vals += ", %s"
-            params.append(True)
+            params.append(True)  # CRITICAL: approved must be True for login to work!
         if has_shadow_banned:
             base_cols += ", shadow_banned"
             base_vals += ", %s"
@@ -3060,6 +3060,28 @@ def create_user():
         """, (user_id, search_vector))
         
         conn.commit()
+        
+        # CRITICAL: Verify user was created correctly with all required fields
+        cur.execute("""
+            SELECT name, password_hash, admin, is_guest, deactivated, 
+                   CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='approved') 
+                        THEN (SELECT approved FROM users WHERE name = %s) 
+                        ELSE NULL END as approved
+            FROM users WHERE name = %s
+        """, (user_id, user_id))
+        verify_user = cur.fetchone()
+        if verify_user:
+            print(f"[DEBUG] User verification:")
+            print(f"[DEBUG]   - name: {verify_user[0]}")
+            print(f"[DEBUG]   - password_hash: {'SET' if verify_user[1] else 'NULL'}")
+            print(f"[DEBUG]   - admin: {verify_user[2]}")
+            print(f"[DEBUG]   - is_guest: {verify_user[3]}")
+            print(f"[DEBUG]   - deactivated: {verify_user[4]}")
+            print(f"[DEBUG]   - approved: {verify_user[5]}")
+            if verify_user[4] == 1:
+                print(f"[ERROR] User is DEACTIVATED! Login will fail!")
+            if verify_user[5] is False:
+                print(f"[ERROR] User is NOT APPROVED! Login will fail!")
         
         # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
         # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
