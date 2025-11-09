@@ -1825,9 +1825,89 @@
                         </div>
                     ` : '';
                     
-                    const messageText = msg.is_deleted ? 
-                        `<em style="color: var(--text-muted); text-decoration: line-through;">${msg.message || 'Mesaj içeriği silindi'}</em>` : 
-                        (msg.message || '<em style="color: var(--text-muted);">Boş mesaj</em>');
+                    // Format file size
+                    const formatFileSize = (bytes) => {
+                        if (!bytes) return '';
+                        if (bytes < 1024) return bytes + ' B';
+                        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                    };
+                    
+                    // Build message content with media support
+                    let messageContent = '';
+                    
+                    if (msg.is_deleted) {
+                        messageContent = `<em style="color: var(--text-muted); text-decoration: line-through;">${msg.message || 'Mesaj içeriği silindi'}</em>`;
+                    } else if (msg.msgtype === 'm.image' && msg.media_http_url) {
+                        // Image message
+                        const imageSize = msg.image_width && msg.image_height ? `${msg.image_width}x${msg.image_height}` : '';
+                        const fileSizeStr = msg.file_size ? ` (${formatFileSize(msg.file_size)})` : '';
+                        messageContent = `
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-image" style="color: var(--accent-blue);"></i>
+                                    <span style="font-weight: 500;">Fotoğraf</span>
+                                    ${imageSize ? `<span style="color: var(--text-muted); font-size: 11px;">${imageSize}</span>` : ''}
+                                    ${fileSizeStr ? `<span style="color: var(--text-muted); font-size: 11px;">${fileSizeStr}</span>` : ''}
+                                </div>
+                                <div style="max-width: 400px; max-height: 300px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+                                    <img src="${msg.thumbnail_http_url || msg.media_http_url}" 
+                                         alt="Fotoğraf" 
+                                         style="width: 100%; height: auto; display: block; cursor: pointer;"
+                                         onclick="window.open('${msg.media_http_url}', '_blank');"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                    <div style="display: none; padding: 12px; text-align: center; color: var(--text-muted);">
+                                        <i class="fas fa-exclamation-triangle"></i> Resim yüklenemedi
+                                    </div>
+                                </div>
+                                <a href="${msg.media_http_url}" 
+                                   target="_blank" 
+                                   style="color: var(--accent-blue); font-size: 12px; text-decoration: none;">
+                                    <i class="fas fa-download"></i> İndir (${formatFileSize(msg.file_size)})
+                                </a>
+                                ${msg.message ? `<div style="margin-top: 4px; color: var(--text-secondary); font-size: 12px;">${msg.message}</div>` : ''}
+                            </div>
+                        `;
+                    } else if (msg.msgtype === 'm.file' && msg.media_http_url) {
+                        // File message
+                        const fileName = msg.message || 'Dosya';
+                        const fileIcon = msg.mimetype && msg.mimetype.startsWith('video/') ? 'fa-video' : 
+                                        msg.mimetype && msg.mimetype.startsWith('audio/') ? 'fa-music' : 
+                                        'fa-file';
+                        messageContent = `
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 8px; background: rgba(74, 144, 226, 0.05); border-radius: 8px; border: 1px solid rgba(74, 144, 226, 0.2);">
+                                <i class="fas ${fileIcon}" style="font-size: 24px; color: var(--accent-blue);"></i>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 500; color: var(--text-primary);">${fileName}</div>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                                        ${msg.mimetype || 'Bilinmeyen tip'} ${msg.file_size ? `• ${formatFileSize(msg.file_size)}` : ''}
+                                    </div>
+                                </div>
+                                <a href="${msg.media_http_url}" 
+                                   target="_blank" 
+                                   class="btn btn-sm btn-primary"
+                                   style="padding: 6px 12px; font-size: 12px;">
+                                    <i class="fas fa-download"></i> İndir
+                                </a>
+                            </div>
+                        `;
+                    } else if (msg.media_http_url) {
+                        // Other media type
+                        messageContent = `
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-paperclip" style="color: var(--accent-blue);"></i>
+                                <span>${msg.message || 'Medya dosyası'}</span>
+                                <a href="${msg.media_http_url}" 
+                                   target="_blank" 
+                                   style="color: var(--accent-blue); font-size: 12px; margin-left: 8px;">
+                                    <i class="fas fa-download"></i> İndir
+                                </a>
+                            </div>
+                        `;
+                    } else {
+                        // Text message
+                        messageContent = msg.message || '<em style="color: var(--text-muted);">Boş mesaj</em>';
+                    }
                     
                     html += `
                         <div class="message-item" data-event-id="${msg.event_id}" style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,${bgOpacity}); border-radius: 8px; border-left: 3px solid ${borderColor}; transition: all 0.3s ease;">
@@ -1839,7 +1919,7 @@
                                 <span style="color: var(--text-muted); font-size: 11px;">${msg.timestamp}</span>
                             </div>
                             <div style="color: var(--text-primary); font-size: 13px; line-height: 1.5;">
-                                ${messageText}
+                                ${messageContent}
                             </div>
                             ${deletedInfo}
                         </div>
@@ -2737,9 +2817,92 @@
                     const deletedBadge = msg.is_deleted ? 
                         '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--accent-red); margin-left: 6px; font-size: 10px;"><i class="fas fa-trash"></i> SİLİNDİ</span>' : '';
                     
-                    const messageText = msg.is_deleted ?
-                        `<span style="text-decoration: line-through; color: var(--text-muted);">${msg.message || 'Silindi'}</span> <em style="font-size: 11px; color: var(--accent-red);">(${msg.deleted_by} tarafından silindi)</em>` :
-                        (msg.message || '<em style="color: var(--text-muted);">Boş mesaj</em>');
+                    // Format file size
+                    const formatFileSize = (bytes) => {
+                        if (!bytes) return '';
+                        if (bytes < 1024) return bytes + ' B';
+                        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                    };
+                    
+                    // Build message content with media support
+                    let messageContent = '';
+                    
+                    if (msg.is_deleted) {
+                        messageContent = `<span style="text-decoration: line-through; color: var(--text-muted);">${msg.message || 'Silindi'}</span> <em style="font-size: 11px; color: var(--accent-red);">(${msg.deleted_by} tarafından silindi)</em>`;
+                    } else if (msg.msgtype === 'm.image' && msg.media_http_url) {
+                        // Image message
+                        const imageSize = msg.image_width && msg.image_height ? `${msg.image_width}x${msg.image_height}` : '';
+                        const fileSizeStr = msg.file_size ? ` (${formatFileSize(msg.file_size)})` : '';
+                        messageContent = `
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-image" style="color: var(--accent-blue);"></i>
+                                    <span style="font-weight: 500;">Fotoğraf</span>
+                                    ${imageSize ? `<span style="color: var(--text-muted); font-size: 11px;">${imageSize}</span>` : ''}
+                                    ${fileSizeStr ? `<span style="color: var(--text-muted); font-size: 11px;">${fileSizeStr}</span>` : ''}
+                                </div>
+                                <div style="max-width: 300px; max-height: 200px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+                                    <img src="${msg.thumbnail_http_url || msg.media_http_url}" 
+                                         alt="Fotoğraf" 
+                                         style="width: 100%; height: auto; display: block; cursor: pointer;"
+                                         onclick="event.stopPropagation(); window.open('${msg.media_http_url}', '_blank');"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                    <div style="display: none; padding: 12px; text-align: center; color: var(--text-muted);">
+                                        <i class="fas fa-exclamation-triangle"></i> Resim yüklenemedi
+                                    </div>
+                                </div>
+                                <a href="${msg.media_http_url}" 
+                                   target="_blank" 
+                                   onclick="event.stopPropagation();"
+                                   style="color: var(--accent-blue); font-size: 12px; text-decoration: none;">
+                                    <i class="fas fa-download"></i> İndir (${formatFileSize(msg.file_size)})
+                                </a>
+                                ${msg.message ? `<div style="margin-top: 4px; color: var(--text-secondary); font-size: 12px;">${msg.message}</div>` : ''}
+                            </div>
+                        `;
+                    } else if (msg.msgtype === 'm.file' && msg.media_http_url) {
+                        // File message
+                        const fileName = msg.message || 'Dosya';
+                        const fileIcon = msg.mimetype && msg.mimetype.startsWith('video/') ? 'fa-video' : 
+                                        msg.mimetype && msg.mimetype.startsWith('audio/') ? 'fa-music' : 
+                                        'fa-file';
+                        messageContent = `
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 8px; background: rgba(74, 144, 226, 0.05); border-radius: 8px; border: 1px solid rgba(74, 144, 226, 0.2);">
+                                <i class="fas ${fileIcon}" style="font-size: 24px; color: var(--accent-blue);"></i>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 500; color: var(--text-primary);">${fileName}</div>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                                        ${msg.mimetype || 'Bilinmeyen tip'} ${msg.file_size ? `• ${formatFileSize(msg.file_size)}` : ''}
+                                    </div>
+                                </div>
+                                <a href="${msg.media_http_url}" 
+                                   target="_blank" 
+                                   onclick="event.stopPropagation();"
+                                   class="btn btn-sm btn-primary"
+                                   style="padding: 6px 12px; font-size: 12px;">
+                                    <i class="fas fa-download"></i> İndir
+                                </a>
+                            </div>
+                        `;
+                    } else if (msg.media_http_url) {
+                        // Other media type
+                        messageContent = `
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-paperclip" style="color: var(--accent-blue);"></i>
+                                <span>${msg.message || 'Medya dosyası'}</span>
+                                <a href="${msg.media_http_url}" 
+                                   target="_blank" 
+                                   onclick="event.stopPropagation();"
+                                   style="color: var(--accent-blue); font-size: 12px; margin-left: 8px;">
+                                    <i class="fas fa-download"></i> İndir
+                                </a>
+                            </div>
+                        `;
+                    } else {
+                        // Text message
+                        messageContent = msg.message || '<em style="color: var(--text-muted);">Boş mesaj</em>';
+                    }
                     
                     html += `
                         <tr style="${msg.is_deleted ? 'background: rgba(239, 68, 68, 0.03);' : ''} cursor: pointer;" 
@@ -2750,7 +2913,7 @@
                             <td style="font-family: monospace; color: var(--accent-blue);">${msg.sender}${deletedBadge}</td>
                             <td style="color: var(--text-secondary);">${msg.room_name}</td>
                             <td style="font-family: monospace; color: var(--accent-green);">${msg.recipient}</td>
-                            <td>${messageText}</td>
+                            <td style="max-width: 500px; word-wrap: break-word;">${messageContent}</td>
                         </tr>
                     `;
                 });

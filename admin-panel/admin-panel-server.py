@@ -1077,6 +1077,13 @@ def get_messages():
                  ORDER BY (ej2.json::json->>'origin_server_ts')::bigint DESC
                  LIMIT 1) as room_name,
                 ej.json::json->'content'->>'body' as message,
+                ej.json::json->'content'->>'msgtype' as msgtype,
+                ej.json::json->'content'->>'url' as media_url,
+                ej.json::json->'content'->'info'->>'mimetype' as mimetype,
+                ej.json::json->'content'->'info'->>'size' as file_size,
+                ej.json::json->'content'->'info'->>'w' as image_width,
+                ej.json::json->'content'->'info'->>'h' as image_height,
+                ej.json::json->'content'->'info'->>'thumbnail_url' as thumbnail_url,
                 (SELECT STRING_AGG(DISTINCT rm.user_id, ', ')
                  FROM room_memberships rm
                  WHERE rm.room_id = e.room_id
@@ -1101,11 +1108,23 @@ def get_messages():
         
         messages = []
         for row in rows:
-            recipients = row[5] if row[5] else ''
-            is_deleted = row[6] is not None  # redacted_by exists
+            # Row structure: timestamp(0), sender(1), room_id(2), room_name(3), message(4), 
+            # msgtype(5), media_url(6), mimetype(7), file_size(8), image_width(9), image_height(10), 
+            # thumbnail_url(11), recipients(12), redacted_by(13), event_id(14)
+            recipients = row[12] if len(row) > 12 and row[12] else ''
+            is_deleted = row[13] is not None if len(row) > 13 else False  # redacted_by exists
             room_name = row[3]
             room_id = row[2]
             sender = row[1]
+            
+            # Extract media/file information
+            msgtype = row[5] if len(row) > 5 else None
+            media_url = row[6] if len(row) > 6 else None
+            mimetype = row[7] if len(row) > 7 else None
+            file_size = row[8] if len(row) > 8 else None
+            image_width = row[9] if len(row) > 9 else None
+            image_height = row[10] if len(row) > 10 else None
+            thumbnail_url = row[11] if len(row) > 11 else None
             
             # Eğer tek alıcı varsa direkt göster, birden fazlaysa sayı göster
             if recipients:
@@ -1146,17 +1165,41 @@ def get_messages():
                 else:
                     room_name = 'İsimsiz oda'
             
+            # Convert MXC URL to HTTP URL if needed
+            media_http_url = None
+            thumbnail_http_url = None
+            homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'matrix-synapse.up.railway.app')
+            synapse_url = os.getenv('SYNAPSE_URL', f'https://{homeserver_domain}')
+            
+            if media_url and media_url.startswith('mxc://'):
+                # Convert mxc://server.com/media_id to https://server.com/_matrix/media/r0/download/server.com/media_id
+                mxc_path = media_url.replace('mxc://', '')
+                media_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
+            
+            if thumbnail_url and thumbnail_url.startswith('mxc://'):
+                mxc_path = thumbnail_url.replace('mxc://', '')
+                thumbnail_http_url = f'{synapse_url}/_matrix/media/r0/download/{mxc_path}'
+            
             messages.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
                 'sender': sender,
                 'room_id': room_id,
                 'room_name': room_name,
                 'message': row[4],
+                'msgtype': msgtype,
+                'media_url': media_url,
+                'media_http_url': media_http_url,
+                'thumbnail_url': thumbnail_url,
+                'thumbnail_http_url': thumbnail_http_url,
+                'mimetype': mimetype,
+                'file_size': int(file_size) if file_size else None,
+                'image_width': int(image_width) if image_width else None,
+                'image_height': int(image_height) if image_height else None,
                 'recipient': recipient_display,
                 'recipient_list': recipient_full_list,
                 'is_deleted': is_deleted,
-                'deleted_by': row[6] if is_deleted else None,
-                'event_id': row[7]
+                'deleted_by': row[13] if is_deleted else None,
+                'event_id': row[14]
             })
         
         cur.close()
@@ -1319,13 +1362,19 @@ def get_room_messages(room_id):
         cur.execute(count_query, (room_id,))
         total = cur.fetchone()[0]
         
-        # Get paginated messages with redaction info
+        # Get paginated messages with redaction info and media
         query = """
             SELECT 
                 to_timestamp(e.origin_server_ts/1000) as timestamp,
                 e.sender,
                 ej.json::json->'content'->>'body' as message,
                 ej.json::json->'content'->>'msgtype' as msgtype,
+                ej.json::json->'content'->>'url' as media_url,
+                ej.json::json->'content'->'info'->>'mimetype' as mimetype,
+                ej.json::json->'content'->'info'->>'size' as file_size,
+                ej.json::json->'content'->'info'->>'w' as image_width,
+                ej.json::json->'content'->'info'->>'h' as image_height,
+                ej.json::json->'content'->'info'->>'thumbnail_url' as thumbnail_url,
                 e.event_id,
                 -- Check if message was deleted using redactions table
                 (SELECT er.sender 
