@@ -17,7 +17,7 @@ DELETE FROM event_auth;
 -- DELETE FROM event_reference_hashes; -- Bu tablo yoksa bu satırı kaldırın veya yorum satırı yapın
 DELETE FROM event_relations;
 DELETE FROM event_to_state_groups;
-DELETE FROM rejected_events;
+-- DELETE FROM rejected_events; -- Bu tablo yoksa bu satırı kaldırın veya yorum satırı yapın
 DELETE FROM state_events;
 DELETE FROM state_groups_state;
 
@@ -143,7 +143,7 @@ DELETE FROM event_auth;
 -- DELETE FROM event_reference_hashes; -- Bu tablo yoksa bu satırı kaldırın
 DELETE FROM event_relations;
 DELETE FROM event_to_state_groups;
-DELETE FROM rejected_events;
+-- DELETE FROM rejected_events; -- Bu tablo yoksa bu satırı kaldırın
 DELETE FROM state_events;
 DELETE FROM state_groups_state;
 
