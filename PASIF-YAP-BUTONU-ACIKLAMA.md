@@ -36,19 +36,19 @@ UPDATE users SET deactivated = 1 WHERE name = %s
 
 ---
 
-## ⚠️ ÖNEMLİ NOT
+## ✅ GÜNCEL DURUM
 
-**Şu anki durum:** Pasif yap butonu sadece veritabanında `deactivated = 1` yapıyor.
+**Pasif yap butonu artık Matrix Synapse Admin API kullanıyor!**
 
-**Eksik özellik:** Matrix Synapse Admin API kullanılmıyor, bu yüzden:
-- ❌ Kullanıcı hala login olabilir
-- ❌ Access token'lar silinmiyor
-- ❌ Kullanıcı oturumları kapatılmıyor
-
-**İdeal durum:** Matrix Admin API ile deactivate edilmeli:
+**Özellikler:**
+- ✅ Matrix Admin API ile deactivate ediliyor
 - ✅ Kullanıcı logout edilir
-- ✅ Tüm oturumlar kapatılır
+- ✅ Tüm oturumlar kapatılır (access tokens silinir)
+- ✅ Tüm cihazlar kaldırılır (devices silinir)
 - ✅ Tekrar login olamaz
+- ✅ Veritabanı da güncellenir (`deactivated = 1`)
+
+**Fallback:** Eğer Matrix API kullanılamazsa, veritabanı yöntemi kullanılır (access tokens ve devices yine de silinir).
 
 ---
 
