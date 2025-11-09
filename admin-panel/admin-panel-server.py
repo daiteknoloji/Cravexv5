@@ -2913,13 +2913,19 @@ def proxy_media_download(server_name, media_id):
         
         # Forward request to Matrix Synapse with headers
         headers = {
-            'User-Agent': 'Cravex-Admin-Panel/1.0'
+            'User-Agent': 'Cravex-Admin-Panel/1.0',
+            'Accept': '*/*'
         }
         if admin_token:
             headers['Authorization'] = f'Bearer {admin_token}'
-            print(f"[DEBUG] Using admin token for authentication")
+            print(f"[DEBUG] Using admin token for authentication: {admin_token[:20]}...")
+        else:
+            print(f"[WARN] No admin token found - trying without authentication")
         
+        print(f"[DEBUG] Request headers: {headers}")
         response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+        print(f"[DEBUG] Response status: {response.status_code}")
+        print(f"[DEBUG] Response headers: {dict(response.headers)}")
         
         if response.status_code == 200:
             # Get content type from response
@@ -2999,6 +3005,53 @@ def proxy_media_download(server_name, media_id):
                     )
                 else:
                     print(f"[DEBUG] Alternative URL 2 failed: {alt_response2.status_code}")
+                    print(f"[DEBUG] Response: {alt_response2.text[:200]}")
+                
+                # Try 3: Matrix Client API endpoint (v3)
+                alt_url3 = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
+                print(f"[DEBUG] Trying alternative URL 3 (client v3): {alt_url3}")
+                alt_response3 = requests.get(alt_url3, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if alt_response3.status_code == 200:
+                    print(f"[DEBUG] ✅ Alternative URL 3 worked!")
+                    content_type = alt_response3.headers.get('Content-Type', 'application/octet-stream')
+                    def generate():
+                        for chunk in alt_response3.iter_content(chunk_size=8192):
+                            if chunk:
+                                yield chunk
+                    return Response(
+                        generate(),
+                        mimetype=content_type,
+                        headers={
+                            'Content-Disposition': f'inline; filename="{media_id}"',
+                            'Cache-Control': 'public, max-age=3600',
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    )
+                else:
+                    print(f"[DEBUG] Alternative URL 3 failed: {alt_response3.status_code}")
+                
+                # Try 4: Matrix Client API endpoint without server_name
+                alt_url4 = f'{synapse_url}/_matrix/client/v3/download/{media_id}'
+                print(f"[DEBUG] Trying alternative URL 4 (client v3, no server_name): {alt_url4}")
+                alt_response4 = requests.get(alt_url4, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if alt_response4.status_code == 200:
+                    print(f"[DEBUG] ✅ Alternative URL 4 worked!")
+                    content_type = alt_response4.headers.get('Content-Type', 'application/octet-stream')
+                    def generate():
+                        for chunk in alt_response4.iter_content(chunk_size=8192):
+                            if chunk:
+                                yield chunk
+                    return Response(
+                        generate(),
+                        mimetype=content_type,
+                        headers={
+                            'Content-Disposition': f'inline; filename="{media_id}"',
+                            'Cache-Control': 'public, max-age=3600',
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    )
+                else:
+                    print(f"[DEBUG] Alternative URL 4 failed: {alt_response4.status_code}")
                 
                 # Try 3: Check if media is on a different server (federated)
                 if server_name != homeserver_domain:
