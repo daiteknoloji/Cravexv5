@@ -2836,6 +2836,46 @@ def export_data():
         print(f"[HATA] /api/export - {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/media/test/<server_name>/<path:media_id>')
+@login_required
+def test_media_access(server_name, media_id):
+    """Test media access - returns debug information"""
+    try:
+        synapse_url = os.getenv('SYNAPSE_URL', f'https://{server_name}')
+        homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'matrix-synapse.up.railway.app')
+        
+        test_urls = [
+            f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}',
+            f'{synapse_url}/_matrix/media/r0/download/{homeserver_domain}/{media_id}',
+            f'{synapse_url}/_matrix/media/r0/download/{media_id}',
+        ]
+        
+        results = []
+        for url in test_urls:
+            try:
+                response = requests.head(url, timeout=10, allow_redirects=True)
+                results.append({
+                    'url': url,
+                    'status': response.status_code,
+                    'headers': dict(response.headers)
+                })
+            except Exception as e:
+                results.append({
+                    'url': url,
+                    'status': 'ERROR',
+                    'error': str(e)
+                })
+        
+        return jsonify({
+            'server_name': server_name,
+            'media_id': media_id,
+            'homeserver_domain': homeserver_domain,
+            'synapse_url': synapse_url,
+            'test_results': results
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/media/download/<server_name>/<path:media_id>')
 @login_required
 def proxy_media_download(server_name, media_id):
