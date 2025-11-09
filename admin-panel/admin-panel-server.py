@@ -2990,7 +2990,19 @@ def proxy_media_download(server_name, media_id):
                 'errcode': 'M_NOT_FOUND',
                 'error': f'Media not found: {response.status_code}',
                 'details': error_text,
-                'requested_url': media_url
+                'requested_url': media_url,
+                'server_name': server_name,
+                'media_id': media_id,
+                'homeserver_domain': homeserver_domain,
+                'synapse_url': synapse_url,
+                'debug_info': {
+                    'tried_urls': [
+                        media_url,
+                        f'{synapse_url}/_matrix/media/r0/download/{homeserver_domain}/{media_id}' if server_name != homeserver_domain else None,
+                        f'{synapse_url}/_matrix/media/r0/download/{media_id}',
+                        f'https://{server_name}/_matrix/media/r0/download/{server_name}/{media_id}' if server_name != homeserver_domain else None
+                    ]
+                }
             }), response.status_code
             
     except requests.exceptions.RequestException as e:
