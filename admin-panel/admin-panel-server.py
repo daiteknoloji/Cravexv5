@@ -1809,6 +1809,7 @@ def toggle_user_deactivate(user_id):
     """Toggle user deactivated status - Matrix API + Database"""
     try:
         deactivate = request.json.get('deactivated', False)
+        new_password = request.json.get('new_password', None)  # Optional: new password when deactivating
         import requests
         
         conn = get_db_connection()
@@ -1856,6 +1857,43 @@ def toggle_user_deactivate(user_id):
                 }
                 
                 if deactivate:
+                    # If new password provided, change it first
+                    if new_password:
+                        try:
+                            # Change password via Matrix Admin API
+                            reset_password_url = f'{synapse_url}/_synapse/admin/v1/reset_password/{user_id}'
+                            password_response = requests.post(
+                                reset_password_url,
+                                headers=headers,
+                                json={'new_password': new_password, 'logout_devices': False},
+                                timeout=5
+                            )
+                            
+                            if password_response.status_code == 200:
+                                print(f"[INFO] Password changed via Matrix API before deactivation: {user_id}")
+                                # Also update database password hash
+                                import bcrypt
+                                salt = bcrypt.gensalt(rounds=12)
+                                password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+                                password_hash = password_hash_bytes.decode('utf-8')
+                                cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
+                            else:
+                                print(f"[WARN] Matrix API password change failed: {password_response.status_code}")
+                                # Fallback: Update database password hash
+                                import bcrypt
+                                salt = bcrypt.gensalt(rounds=12)
+                                password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+                                password_hash = password_hash_bytes.decode('utf-8')
+                                cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
+                        except Exception as pwd_error:
+                            print(f"[WARN] Password change error: {pwd_error}")
+                            # Fallback: Update database password hash
+                            import bcrypt
+                            salt = bcrypt.gensalt(rounds=12)
+                            password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+                            password_hash = password_hash_bytes.decode('utf-8')
+                            cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
+                    
                     # Deactivate via Synapse Admin API
                     api_url = f'{synapse_url}/_synapse/admin/v1/deactivate/{user_id}'
                     try:
