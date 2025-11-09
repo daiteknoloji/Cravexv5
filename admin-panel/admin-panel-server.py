@@ -3136,7 +3136,51 @@ def proxy_media_download(server_name, media_id):
         
         print(f"[INFO] ⏳ Media not in cache, fetching from Matrix: {media_id}")
         
-        # Try Matrix Client API v3 endpoint first (more reliable)
+        # Try Matrix Media API v3 endpoint first (Element Web uses this format)
+        media_v3_url = None
+        media_v3_tried = False
+        if sender_token:
+            # Matrix Media API v3 endpoint (Element Web format: /_matrix/media/v3/download/)
+            # Format: /_matrix/media/v3/download/{server_name}/{media_id}?allow_redirect=true
+            media_v3_url = f'{synapse_url}/_matrix/media/v3/download/{server_name}/{media_id}?allow_redirect=true'
+            print(f"[DEBUG] Trying Matrix Media API v3 (Element Web format): {media_v3_url}")
+            try:
+                media_v3_response = requests.get(media_v3_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                print(f"[DEBUG] Media API v3 response: {media_v3_response.status_code}")
+                if media_v3_response.status_code == 200:
+                    print(f"[DEBUG] ✅ Matrix Media API v3 worked!")
+                    content_type = media_v3_response.headers.get('Content-Type', 'application/octet-stream')
+                    media_data = media_v3_response.content
+                    file_size = len(media_data)
+                    
+                    # Cache'e kaydet
+                    mxc_url = f'mxc://{server_name}/{media_id}'
+                    save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type, None, None)
+                    
+                    def generate():
+                        yield media_data
+                    
+                    return Response(
+                        generate(),
+                        mimetype=content_type,
+                        headers={
+                            'Content-Disposition': f'inline; filename="{media_id}"',
+                            'Cache-Control': 'public, max-age=3600',
+                            'Access-Control-Allow-Origin': '*',
+                            'X-Cache': 'MISS',
+                            'X-Source': 'Media-API-v3'
+                        }
+                    )
+                else:
+                    print(f"[DEBUG] Media API v3 failed: {media_v3_response.status_code}")
+                    if hasattr(media_v3_response, 'text'):
+                        print(f"[DEBUG] Media API v3 response text: {media_v3_response.text[:200]}")
+            except Exception as e:
+                print(f"[WARN] Media API v3 error: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Try Matrix Client API v3 endpoint (fallback)
         client_api_url = None
         client_api_tried = False
         if sender_token:
