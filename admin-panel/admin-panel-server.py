@@ -3135,6 +3135,45 @@ def proxy_media_download(server_name, media_id):
             )
         
         print(f"[INFO] ⏳ Media not in cache, fetching from Matrix: {media_id}")
+        
+        # Try Matrix Client API v3 endpoint first (more reliable)
+        client_api_url = None
+        if sender_token:
+            # Matrix Client API v3 endpoint (requires auth)
+            client_api_url = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
+            print(f"[DEBUG] Trying Matrix Client API v3: {client_api_url}")
+            try:
+                client_response = requests.get(client_api_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                if client_response.status_code == 200:
+                    print(f"[DEBUG] ✅ Matrix Client API v3 worked!")
+                    content_type = client_response.headers.get('Content-Type', 'application/octet-stream')
+                    media_data = client_response.content
+                    file_size = len(media_data)
+                    
+                    # Cache'e kaydet
+                    mxc_url = f'mxc://{server_name}/{media_id}'
+                    save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type, None, None)
+                    
+                    def generate():
+                        yield media_data
+                    
+                    return Response(
+                        generate(),
+                        mimetype=content_type,
+                        headers={
+                            'Content-Disposition': f'inline; filename="{media_id}"',
+                            'Cache-Control': 'public, max-age=3600',
+                            'Access-Control-Allow-Origin': '*',
+                            'X-Cache': 'MISS',
+                            'X-Source': 'Client-API-v3'
+                        }
+                    )
+                else:
+                    print(f"[DEBUG] Matrix Client API v3 failed: {client_response.status_code}")
+            except Exception as e:
+                print(f"[WARN] Matrix Client API v3 error: {e}")
+        
+        # Fallback to media API
         print(f"[DEBUG] Request headers: {headers}")
         response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
         print(f"[DEBUG] Response status: {response.status_code}")
@@ -3176,8 +3215,40 @@ def proxy_media_download(server_name, media_id):
             print(f"[WARN] Request URL: {media_url}")
             
             # Try alternative URL formats
-            if response.status_code == 404:
-                print(f"[DEBUG] Primary URL failed with 404, trying alternatives...")
+            if response.status_code == 404 or response.status_code >= 500:
+                print(f"[DEBUG] Primary URL failed with {response.status_code}, trying alternatives...")
+                
+                # Try 0: Matrix Client API v3 (if not tried yet)
+                if sender_token and not client_api_url:
+                    client_api_url = f'{synapse_url}/_matrix/client/v3/download/{server_name}/{media_id}'
+                    print(f"[DEBUG] Trying Matrix Client API v3: {client_api_url}")
+                    try:
+                        client_response = requests.get(client_api_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
+                        if client_response.status_code == 200:
+                            print(f"[DEBUG] ✅ Matrix Client API v3 worked!")
+                            content_type = client_response.headers.get('Content-Type', 'application/octet-stream')
+                            media_data = client_response.content
+                            file_size = len(media_data)
+                            
+                            mxc_url = f'mxc://{server_name}/{media_id}'
+                            save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type, None, None)
+                            
+                            def generate():
+                                yield media_data
+                            
+                            return Response(
+                                generate(),
+                                mimetype=content_type,
+                                headers={
+                                    'Content-Disposition': f'inline; filename="{media_id}"',
+                                    'Cache-Control': 'public, max-age=3600',
+                                    'Access-Control-Allow-Origin': '*',
+                                    'X-Cache': 'MISS',
+                                    'X-Source': 'Client-API-v3-Fallback'
+                                }
+                            )
+                    except Exception as e:
+                        print(f"[WARN] Matrix Client API v3 fallback error: {e}")
                 
                 # Try 1: Use homeserver_domain instead of server_name
                 if server_name != homeserver_domain:
