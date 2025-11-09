@@ -1806,168 +1806,13 @@ def toggle_user_admin(user_id):
 @app.route('/api/users/<user_id>/deactivate', methods=['PUT'])
 @login_required
 def toggle_user_deactivate(user_id):
-    """Toggle user deactivated status - Matrix API + Database"""
+    """Toggle user deactivated status (activate/deactivate)"""
     try:
         deactivate = request.json.get('deactivated', False)
-        new_password = request.json.get('new_password', None)  # Optional: new password when deactivating
-        import requests
         
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Get admin token (for Matrix API)
-        cur.execute(
-            "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
-            (ADMIN_USER_ID,)
-        )
-        token_row = cur.fetchone()
-        admin_token = token_row[0] if token_row else None
-        
-        # If no token, try auto-login
-        if not admin_token:
-            admin_username = os.getenv('ADMIN_USERNAME', 'admin')
-            admin_password = os.getenv('ADMIN_PASSWORD')
-            synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-            
-            if admin_password:
-                try:
-                    login_response = requests.post(
-                        f'{synapse_url}/_matrix/client/v3/login',
-                        json={
-                            'type': 'm.login.password',
-                            'identifier': {'type': 'm.id.user', 'user': admin_username},
-                            'password': admin_password
-                        },
-                        timeout=10
-                    )
-                    
-                    if login_response.status_code == 200:
-                        admin_token = login_response.json().get('access_token')
-                except Exception as login_error:
-                    print(f"[WARN] Auto-login failed: {login_error}")
-        
-        # Try Matrix Admin API (but don't fail if it's unavailable)
-        matrix_api_success = False
-        if admin_token:
-            try:
-                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-                headers = {
-                    'Authorization': f'Bearer {admin_token}',
-                    'Content-Type': 'application/json'
-                }
-                
-                if deactivate:
-                    # If new password provided, change it first
-                    if new_password:
-                        try:
-                            # Change password via Matrix Admin API
-                            reset_password_url = f'{synapse_url}/_synapse/admin/v1/reset_password/{user_id}'
-                            password_response = requests.post(
-                                reset_password_url,
-                                headers=headers,
-                                json={'new_password': new_password, 'logout_devices': False},
-                                timeout=5
-                            )
-                            
-                            if password_response.status_code == 200:
-                                print(f"[INFO] Password changed via Matrix API before deactivation: {user_id}")
-                                # Also update database password hash
-                                import bcrypt
-                                salt = bcrypt.gensalt(rounds=12)
-                                password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
-                                password_hash = password_hash_bytes.decode('utf-8')
-                                cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
-                            else:
-                                print(f"[WARN] Matrix API password change failed: {password_response.status_code}")
-                                # Fallback: Update database password hash
-                                import bcrypt
-                                salt = bcrypt.gensalt(rounds=12)
-                                password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
-                                password_hash = password_hash_bytes.decode('utf-8')
-                                cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
-                        except Exception as pwd_error:
-                            print(f"[WARN] Password change error: {pwd_error}")
-                            # Fallback: Update database password hash
-                            import bcrypt
-                            salt = bcrypt.gensalt(rounds=12)
-                            password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
-                            password_hash = password_hash_bytes.decode('utf-8')
-                            cur.execute("UPDATE users SET password_hash = %s WHERE name = %s", (password_hash, user_id))
-                    
-                    # Deactivate via Synapse Admin API
-                    api_url = f'{synapse_url}/_synapse/admin/v1/deactivate/{user_id}'
-                    try:
-                        response = requests.post(
-                            api_url, 
-                            headers=headers, 
-                            json={'erase': False},
-                            timeout=5  # Reduced timeout
-                        )
-                        
-                        if response.status_code == 200:
-                            print(f"[INFO] User deactivated via Matrix API: {user_id}")
-                            matrix_api_success = True
-                        else:
-                            print(f"[WARN] Matrix API deactivate failed: {response.status_code}")
-                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-                        print(f"[WARN] Matrix API timeout/connection error (will use database only): {e}")
-                    
-                    # Always delete tokens/devices (even if API failed)
-                    cur.execute("DELETE FROM access_tokens WHERE user_id = %s", (user_id,))
-                    cur.execute("DELETE FROM devices WHERE user_id = %s", (user_id,))
-                else:
-                    # Activate via Synapse Admin API v2
-                    # Get current user data first to preserve password
-                    try:
-                        api_get_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
-                        get_response = requests.get(api_get_url, headers=headers, timeout=5)
-                        
-                        if get_response.status_code == 200:
-                            user_data = get_response.json()
-                            # Only change deactivated status, preserve everything else (especially password)
-                            user_data['deactivated'] = False
-                            # Remove password field if it exists (we don't want to change it)
-                            if 'password' in user_data:
-                                del user_data['password']
-                            
-                            # Update user via Admin API
-                            api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
-                            response = requests.put(
-                                api_url, 
-                                headers=headers, 
-                                json=user_data,
-                                timeout=5
-                            )
-                            
-                            if response.status_code == 200:
-                                print(f"[INFO] User activated via Matrix API (password preserved): {user_id}")
-                                matrix_api_success = True
-                            else:
-                                print(f"[WARN] Matrix API activate failed: {response.status_code} - {response.text[:200]}")
-                        else:
-                            # If can't get user data, try simple update without password
-                            print(f"[WARN] Could not get user data: {get_response.status_code}, trying simple activate...")
-                            api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
-                            response = requests.put(
-                                api_url, 
-                                headers=headers, 
-                                json={'deactivated': False},
-                                timeout=5
-                            )
-                            
-                            if response.status_code == 200:
-                                print(f"[INFO] User activated via Matrix API: {user_id}")
-                                matrix_api_success = True
-                            else:
-                                print(f"[WARN] Matrix API activate failed: {response.status_code} - {response.text[:200]}")
-                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-                        print(f"[WARN] Matrix API timeout/connection error (will use database only): {e}")
-                    except Exception as api_error:
-                        print(f"[WARN] Matrix API error during activation: {api_error}")
-            except Exception as api_error:
-                print(f"[WARN] Matrix API error (will use database only): {api_error}")
-        
-        # Update database
         cur.execute("""
             UPDATE users SET deactivated = %s WHERE name = %s
         """, (1 if deactivate else 0, user_id))
@@ -1976,37 +1821,20 @@ def toggle_user_deactivate(user_id):
         cur.close()
         conn.close()
         
-        if deactivate:
-            msg = f'Kullanıcı pasif yapıldı - Tüm oturumlar kapatıldı'
-            if new_password:
-                msg += f' - Yeni şifre belirlendi (aktif edildiğinde bu şifre ile login olabilir)'
-            if not matrix_api_success:
-                msg += ' (Sadece veritabanı güncellendi - Matrix API kullanılamadı)'
-            return jsonify({
-                'success': True,
-                'message': msg,
-                'deactivated': True
-            })
-        else:
-            msg = f'Kullanıcı aktif yapıldı - Artık login olabilir'
-            if not matrix_api_success:
-                msg += ' (Sadece veritabanı güncellendi - Matrix API kullanılamadı)'
-            return jsonify({
-                'success': True,
-                'message': msg,
-                'deactivated': False
-            })
+        return jsonify({
+            'success': True,
+            'message': f'Kullanıcı {"pasif yapıldı" if deactivate else "aktif yapıldı"}',
+            'deactivated': bool(deactivate)
+        })
         
     except Exception as e:
         print(f"[HATA] PUT /api/users/{user_id}/deactivate - {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e), 'success': False}), 500
 
 @app.route('/api/users/<user_id>', methods=['DELETE'])
 @login_required
 def delete_user(user_id):
-    """Delete user completely from database"""
+    """Delete user (deactivate and mark as erased)"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -2018,25 +1846,20 @@ def delete_user(user_id):
             conn.close()
             return jsonify({'error': 'Kullanıcı bulunamadı', 'success': False}), 404
         
-        # Delete related data first (foreign key constraints)
+        # Deactivate user
+        cur.execute("""
+            UPDATE users SET deactivated = 1 WHERE name = %s
+        """, (user_id,))
+        
         # Delete access tokens (logout all sessions)
-        cur.execute("DELETE FROM access_tokens WHERE user_id = %s", (user_id,))
+        cur.execute("""
+            DELETE FROM access_tokens WHERE user_id = %s
+        """, (user_id,))
         
         # Delete devices
-        cur.execute("DELETE FROM devices WHERE user_id = %s", (user_id,))
-        
-        # Delete room memberships
-        cur.execute("DELETE FROM room_memberships WHERE user_id = %s", (user_id,))
-        
-        # Delete user directory entries
-        cur.execute("DELETE FROM user_directory WHERE user_id = %s", (user_id,))
-        cur.execute("DELETE FROM user_directory_search WHERE user_id = %s", (user_id,))
-        
-        # Delete profiles
-        cur.execute("DELETE FROM profiles WHERE user_id = %s", (user_id,))
-        
-        # Delete user from users table (MAIN DELETE)
-        cur.execute("DELETE FROM users WHERE name = %s", (user_id,))
+        cur.execute("""
+            DELETE FROM devices WHERE user_id = %s
+        """, (user_id,))
         
         conn.commit()
         cur.close()
@@ -2110,39 +1933,26 @@ def change_user_password(user_id):
             cur.close()
             conn.close()
             
-            # If we have a token, try Matrix Admin API (but don't fail if unavailable)
+            # If we have a token, use Matrix Admin API
             if admin_token:
-                try:
-                    synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-                    headers = {
-                        'Authorization': f'Bearer {admin_token}',
-                        'Content-Type': 'application/json'
-                    }
-                    
-                    # Reset password via Synapse Admin API
-                    api_url = f'{synapse_url}/_synapse/admin/v1/reset_password/{user_id}'
-                    try:
-                        response = requests.post(
-                            api_url, 
-                            headers=headers, 
-                            json={'new_password': new_password, 'logout_devices': False}, 
-                            timeout=5
-                        )
-                        
-                        if response.status_code == 200:
-                            return jsonify({
-                                'success': True,
-                                'message': f'Şifre başarıyla değiştirildi (Matrix API)',
-                                'method': 'matrix_api'
-                            })
-                        else:
-                            print(f"[WARN] Matrix API password change failed: {response.status_code} - {response.text[:200]}")
-                            # Fallback to database method
-                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-                        print(f"[WARN] Matrix API timeout/connection error (will use database): {e}")
-                        # Fallback to database method
-                except Exception as api_error:
-                    print(f"[WARN] Matrix API error (will use database): {api_error}")
+                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+                headers = {
+                    'Authorization': f'Bearer {admin_token}',
+                    'Content-Type': 'application/json'
+                }
+                
+                # Reset password via Synapse Admin API
+                api_url = f'{synapse_url}/_synapse/admin/v1/reset_password/{user_id}'
+                response = requests.post(api_url, headers=headers, json={'new_password': new_password, 'logout_devices': False}, timeout=10)
+                
+                if response.status_code == 200:
+                    return jsonify({
+                        'success': True,
+                        'message': f'Şifre başarıyla değiştirildi (Matrix API)',
+                        'method': 'matrix_api'
+                    })
+                else:
+                    print(f"[WARN] Matrix API password change failed: {response.status_code} - {response.text[:200]}")
                     # Fallback to database method
             
             # Fallback: Database method
@@ -2150,18 +1960,8 @@ def change_user_password(user_id):
             conn = get_db_connection()
             cur = conn.cursor()
             
-            # Hash password using bcrypt (Matrix Synapse format)
-            import bcrypt
-            # Generate salt with 12 rounds (Matrix Synapse default)
-            salt = bcrypt.gensalt(rounds=12)
-            # Hash the password
-            password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
-            # Convert to string (Matrix Synapse stores as TEXT/VARCHAR)
-            password_hash = password_hash_bytes.decode('utf-8')
-            # Verify hash format
-            if not password_hash.startswith('$2b$12$'):
-                print(f"[ERROR] Invalid hash format: {password_hash[:20]}...")
-            print(f"[DEBUG] Password hash created: {password_hash[:30]}... (length: {len(password_hash)})")
+            # Hash password with bcrypt
+            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
             # Update password in database
             cur.execute("""
@@ -2259,45 +2059,38 @@ def create_user():
                         print(f"[WARN] Auto-login error: {login_error}")
             
             if admin_token:
-                # Try Matrix API (but don't fail if unavailable)
-                try:
-                    import requests
-                    
-                    print(f"[DEBUG] Admin token found: {admin_token[:20]}...")
-                    
-                    headers = {
-                        'Authorization': f'Bearer {admin_token}',
-                        'Content-Type': 'application/json'
-                    }
-                    
-                    user_data = {
-                        'password': password,
-                        'displayname': displayname if displayname else username,
-                        'admin': make_admin,
-                        'deactivated': False
-                    }
-                    
-                    # Use Synapse URL (localhost for local, Railway URL for production)
-                    synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-                    api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
-                    
-                    print(f"[DEBUG] Calling Synapse API: {api_url}")
-                    try:
-                        response = requests.put(api_url, headers=headers, json=user_data, timeout=5)
-                        print(f"[DEBUG] Synapse API response: {response.status_code} - {response.text[:100]}")
-                        
-                        if response.status_code == 200 or response.status_code == 201:
-                            return jsonify({
-                                'success': True,
-                                'user_id': user_id,
-                                'message': 'User created successfully via Matrix API!'
-                            })
-                        else:
-                            print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
-                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-                        print(f"[WARN] Matrix API timeout/connection error (will use database): {e}")
-                except Exception as api_error:
-                    print(f"[WARN] Matrix API error (will use database): {api_error}")
+                # Matrix API available - use it
+                import requests
+                
+                print(f"[DEBUG] Admin token found: {admin_token[:20]}...")
+                
+                headers = {
+                    'Authorization': f'Bearer {admin_token}',
+                    'Content-Type': 'application/json'
+                }
+                
+                user_data = {
+                    'password': password,
+                    'displayname': displayname if displayname else username,
+                    'admin': make_admin
+                }
+                
+                # Use Synapse URL (localhost for local, Railway URL for production)
+                synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+                api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
+                
+                print(f"[DEBUG] Calling Synapse API: {api_url}")
+                response = requests.put(api_url, headers=headers, json=user_data, timeout=10)
+                print(f"[DEBUG] Synapse API response: {response.status_code} - {response.text[:100]}")
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    return jsonify({
+                        'success': True,
+                        'user_id': user_id,
+                        'message': 'User created successfully via Matrix API!'
+                    })
+                else:
+                    print(f"[WARN] Synapse API failed with {response.status_code}, falling back to database")
         except Exception as api_error:
             print(f"[INFO] Matrix API not available, using database fallback: {api_error}")
         
@@ -2315,19 +2108,9 @@ def create_user():
             conn.close()
             return jsonify({'error': 'User already exists', 'success': False}), 409
         
-        # Hash password using bcrypt (Matrix Synapse format)
-        # Matrix Synapse uses bcrypt with $2b$ prefix and expects string format
-        import bcrypt
-        # Generate salt with 12 rounds (Matrix Synapse default)
-        salt = bcrypt.gensalt(rounds=12)
-        # Hash the password
-        password_hash_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
-        # Convert to string (Matrix Synapse stores as TEXT/VARCHAR)
-        password_hash = password_hash_bytes.decode('utf-8')
-        # Verify hash format (should start with $2b$12$)
-        if not password_hash.startswith('$2b$12$'):
-            print(f"[ERROR] Invalid hash format: {password_hash[:20]}...")
-        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:30]}... (length: {len(password_hash)})")
+        # Hash password (bcrypt with 12 rounds - same as Synapse)
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
+        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:20]}...")
         
         # Insert user (with all required columns)
         creation_ts = int(time.time())  # Synapse uses SECONDS, not milliseconds
