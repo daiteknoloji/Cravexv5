@@ -2830,7 +2830,10 @@ def proxy_media_download(server_name, media_id):
     """Proxy media download requests to Matrix Synapse"""
     try:
         synapse_url = os.getenv('SYNAPSE_URL', f'https://{server_name}')
+        # Matrix media URL format: /_matrix/media/r0/download/{server_name}/{media_id}
         media_url = f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
+        
+        print(f"[DEBUG] Proxying media download: {media_url}")
         
         # Forward request to Matrix Synapse
         response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True)
@@ -2838,6 +2841,8 @@ def proxy_media_download(server_name, media_id):
         if response.status_code == 200:
             # Get content type from response
             content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            
+            print(f"[DEBUG] Media download successful: {content_type}")
             
             # Stream the response
             def generate():
@@ -2850,13 +2855,16 @@ def proxy_media_download(server_name, media_id):
                 mimetype=content_type,
                 headers={
                     'Content-Disposition': f'inline; filename="{media_id}"',
-                    'Cache-Control': 'public, max-age=3600'
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*'
                 }
             )
         else:
+            print(f"[WARN] Media download failed: {response.status_code} - {response.text[:200]}")
             return jsonify({
                 'errcode': 'M_NOT_FOUND',
-                'error': f'Media not found: {response.status_code}'
+                'error': f'Media not found: {response.status_code}',
+                'details': response.text[:200] if hasattr(response, 'text') else ''
             }), response.status_code
             
     except requests.exceptions.RequestException as e:
