@@ -1077,8 +1077,13 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" onclick="toggleMobileSidebar()" id="mobileMenuToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        
         <!-- Sidebar Navigation -->
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
                     <img src="/static/1.svg" alt="Cravex Logo" onerror="this.style.display='none'">
@@ -1668,6 +1673,20 @@
         loadStats();
         
         // Page Navigation
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('mobile-visible');
+        }
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.getElementById('mobileMenuToggle');
+            if (window.innerWidth <= 768 && sidebar && toggle && !sidebar.contains(event.target) && !toggle.contains(event.target)) {
+                sidebar.classList.remove('mobile-visible');
+            }
+        });
+        
         function showPage(pageName) {
             // Update navigation
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
