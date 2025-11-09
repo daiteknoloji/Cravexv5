@@ -3276,9 +3276,11 @@ def proxy_media_thumbnail(server_name, media_id):
         headers = {
             'User-Agent': 'Cravex-Admin-Panel/1.0'
         }
-        if admin_token:
-            headers['Authorization'] = f'Bearer {admin_token}'
-            print(f"[DEBUG] Using admin token for authentication")
+        if sender_token:
+            headers['Authorization'] = f'Bearer {sender_token}'
+            print(f"[DEBUG] Using sender token for authentication: {sender_token[:20]}...")
+        else:
+            print(f"[WARN] No token found - trying without authentication")
         
         response = requests.get(thumbnail_url, stream=True, timeout=30, allow_redirects=True, headers=headers)
         
