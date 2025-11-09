@@ -1787,6 +1787,14 @@ def get_room_messages(room_id):
                 if msgtype == 'm.image':
                     thumbnail_http_url = mxc_to_http(media_url, use_thumbnail=True)
             
+            # Otomatik medya cache'leme: Mesajları okurken medya dosyalarını otomatik olarak cache'e kaydet
+            if media_url and row[1] and row[10]:  # media_url, sender, event_id varsa
+                try:
+                    # Background'da cache'le (blocking olmaması için)
+                    auto_cache_media_from_message(media_url, row[1], row[10], msgtype, thumbnail_url)
+                except Exception as cache_err:
+                    print(f"[WARN] Auto-cache failed for message {row[10]}: {cache_err}")
+            
             messages.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
                 'sender': row[1],
