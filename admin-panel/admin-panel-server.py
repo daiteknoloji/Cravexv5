@@ -2352,16 +2352,53 @@ def get_user_details(user_id):
         cur.close()
         conn.close()
         
+        # Parse creation_ts (can be milliseconds or seconds)
+        created_str = ''
+        if user_row[2]:
+            try:
+                creation_ts = user_row[2]
+                if creation_ts > 10000000000:  # Milliseconds
+                    created_str = datetime.fromtimestamp(creation_ts / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                else:  # Seconds
+                    created_str = datetime.fromtimestamp(creation_ts).strftime('%Y-%m-%d %H:%M:%S')
+            except Exception as ts_err:
+                created_str = str(user_row[2])
+        
+        # Parse last_seen (always milliseconds in devices table)
+        last_seen_str = 'Hiç görülmedi'
+        if last_seen:
+            try:
+                last_seen_str = datetime.fromtimestamp(last_seen / 1000).strftime('%Y-%m-%d %H:%M:%S')
+            except Exception as ls_err:
+                last_seen_str = str(last_seen)
+        
+        # Parse device last_seen timestamps
+        device_list = []
+        for d in devices:
+            device_last_seen = 'Bilinmiyor'
+            if d[1]:
+                try:
+                    device_last_seen = datetime.fromtimestamp(d[1] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception as dev_err:
+                    device_last_seen = str(d[1])
+            
+            device_list.append({
+                'device_id': d[0],
+                'last_seen': device_last_seen,
+                'ip': d[2],
+                'user_agent': d[3]
+            })
+        
         return jsonify({
             'user_id': user_row[0],
             'admin': bool(user_row[1]),
-            'created': datetime.fromtimestamp(user_row[2]).strftime('%Y-%m-%d %H:%M:%S') if user_row[2] else '',
+            'created': created_str,
             'deactivated': bool(user_row[3]),
             'shadow_banned': bool(user_row[4]) if user_row[4] is not None else False,
             'locked': bool(user_row[5]) if user_row[5] is not None else False,
-            'last_seen': datetime.fromtimestamp(last_seen/1000).strftime('%Y-%m-%d %H:%M:%S') if last_seen else 'Hiç görülmedi',
+            'last_seen': last_seen_str,
             'rooms': [{'room_id': r[0], 'name': r[1] or 'İsimsiz Oda', 'member_count': r[2]} for r in rooms],
-            'devices': [{'device_id': d[0], 'last_seen': datetime.fromtimestamp(d[1]/1000).strftime('%Y-%m-%d %H:%M:%S') if d[1] else 'Bilinmiyor', 'ip': d[2], 'user_agent': d[3]} for d in devices]
+            'devices': device_list
         })
         
     except Exception as e:
