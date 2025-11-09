@@ -2090,6 +2090,9 @@
                 
                 // Apply filters
                 filteredUsers = allUsers.filter(user => {
+                    // Hide deleted users by default (they should be in "Silinen Kullanıcılar" section)
+                    if (user.deleted) return false; // Hide deleted users
+                    
                     // Hide deactivated users by default (unless explicitly filtered)
                     const roleFilter = document.getElementById('filterRole').value;
                     if (!roleFilter && user.deactivated) return false; // Hide deactivated unless filtering for them
