@@ -3146,11 +3146,17 @@ def proxy_media_download(server_name, media_id):
             
             print(f"[DEBUG] Media download successful: {content_type}")
             
+            # Media data'yı memory'de topla (cache için)
+            media_data = response.content
+            file_size = len(media_data)
+            
+            # Cache'e kaydet (küçük dosyalar için)
+            mxc_url = f'mxc://{server_name}/{media_id}'
+            save_media_to_cache(media_id, server_name, mxc_url, media_data, content_type, None, None)
+            
             # Stream the response
             def generate():
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        yield chunk
+                yield media_data
             
             return Response(
                 generate(),
@@ -3158,7 +3164,8 @@ def proxy_media_download(server_name, media_id):
                 headers={
                     'Content-Disposition': f'inline; filename="{media_id}"',
                     'Cache-Control': 'public, max-age=3600',
-                    'Access-Control-Allow-Origin': '*'
+                    'Access-Control-Allow-Origin': '*',
+                    'X-Cache': 'MISS'
                 }
             )
         else:
