@@ -1944,7 +1944,7 @@ def add_room_member(room_id):
             
             # If invite sent successfully, try to auto-join user with their token
             if invite_response.status_code == 200:
-                print(f"[INFO] Invite sent, trying to auto-join user with their token...")
+                print(f"[INFO] Invite sent successfully, trying to auto-join user with their token...")
                 join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
                 
                 # Get user's access token to join as them (auto-accept invite)
@@ -1956,8 +1956,6 @@ def add_room_member(room_id):
                 )
                 user_token_row = cur.fetchone()
                 user_token = user_token_row[0] if user_token_row else None
-                cur.close()
-                conn.close()
                 
                 if user_token:
                     # Join as the user (auto-accept invite, they will get notification)
@@ -1970,41 +1968,74 @@ def add_room_member(room_id):
                     print(f"[INFO] User join result: {user_join_response.status_code} - {user_join_response.text[:200]}")
                     
                     if user_join_response.status_code == 200:
+                        # Success! User auto-joined, they got notification
+                        cur.close()
+                        conn.close()
                         return jsonify({
                             'success': True,
                             'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
                             'method': 'invite_autojoin'
                         })
-            
-            # Add to database (invite sent or not, user will be added)
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            import time
-            event_id = f"$admin_force_add_{int(time.time()*1000)}"
-            
-            cur.execute("""
-                INSERT INTO room_memberships (event_id, user_id, sender, room_id, membership)
-                VALUES (%s, %s, %s, %s, 'join')
-                ON CONFLICT DO NOTHING
-            """, (event_id, user_id, ADMIN_USER_ID, room_id))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            if invite_response.status_code == 200:
+                    elif user_join_response.status_code == 403:
+                        # User might already be in room, check database
+                        cur.execute(
+                            "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id = %s AND membership = 'join'",
+                            (room_id, user_id)
+                        )
+                        already_member = cur.fetchone()[0] > 0
+                        cur.close()
+                        conn.close()
+                        
+                        if already_member:
+                            return jsonify({
+                                'success': True,
+                                'message': f'✅ {user_id} zaten odada!',
+                                'method': 'already_member'
+                            })
+                
+                cur.close()
+                conn.close()
+                
+                # Invite sent but couldn't auto-join - add to database anyway
+                # User will see invite notification and can accept manually
+                conn = get_db_connection()
+                cur = conn.cursor()
+                import time
+                event_id = f"$admin_force_add_{int(time.time()*1000)}"
+                cur.execute("""
+                    INSERT INTO room_memberships (event_id, user_id, sender, room_id, membership)
+                    VALUES (%s, %s, %s, %s, 'join')
+                    ON CONFLICT DO NOTHING
+                """, (event_id, user_id, ADMIN_USER_ID, room_id))
+                conn.commit()
+                cur.close()
+                conn.close()
+                
                 return jsonify({
                     'success': True,
                     'message': f'✅ {user_id} odaya eklendi! Davet gönderildi, Element Web\'de bildirim alacak.',
                     'method': 'invite_database'
                 })
-            else:
-                return jsonify({
-                    'success': True,
-                    'message': f'✅ {user_id} odaya eklendi. Element Web\'de refresh yapması gerekebilir.',
-                    'method': 'database'
-                })
+            
+            # Invite failed or not sent - add to database anyway
+            conn = get_db_connection()
+            cur = conn.cursor()
+            import time
+            event_id = f"$admin_force_add_{int(time.time()*1000)}"
+            cur.execute("""
+                INSERT INTO room_memberships (event_id, user_id, sender, room_id, membership)
+                VALUES (%s, %s, %s, %s, 'join')
+                ON CONFLICT DO NOTHING
+            """, (event_id, user_id, ADMIN_USER_ID, room_id))
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'message': f'✅ {user_id} odaya eklendi. Element Web\'de refresh yapması gerekebilir.',
+                'method': 'database'
+            })
                 
         except Exception as api_error:
             print(f"[ERROR] Matrix API error: {api_error}")
