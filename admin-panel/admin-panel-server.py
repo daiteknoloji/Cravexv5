@@ -1958,6 +1958,29 @@ def add_room_member(room_id):
             
             # If Admin API failed, try sending invite first (so user gets notification)
             print(f"[WARN] Admin API failed ({admin_api_response.status_code}), trying invite...")
+            
+            # Double-check admin is in room before sending invite (invite requires admin to be in room)
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id = %s AND membership = 'join'",
+                (room_id, ADMIN_USER_ID)
+            )
+            admin_still_in_room = cur.fetchone()[0] > 0
+            cur.close()
+            conn.close()
+            
+            if not admin_still_in_room:
+                print(f"[WARN] Admin not in room, trying to add admin again before invite...")
+                try:
+                    client_join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                    admin_client_response = requests.post(client_join_url, headers=headers, json={}, timeout=10)
+                    print(f"[INFO] Admin Client API join (retry) result: {admin_client_response.status_code}")
+                    if admin_client_response.status_code == 200:
+                        print(f"[INFO] ✅ Admin successfully joined room (retry)!")
+                except Exception as retry_err:
+                    print(f"[ERROR] Admin join retry failed: {retry_err}")
+            
             invite_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
             print(f"[INFO] Invite URL: {invite_url}")
             invite_response = requests.post(invite_url, headers=headers, json={'user_id': user_id}, timeout=10)
