@@ -2671,11 +2671,13 @@ def change_user_password(user_id):
                 print(f"[DEBUG] Verified updated password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
                 print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
             
-            # CRITICAL: Verify password works by testing with bcrypt.checkpw
+            conn.commit()
+            
+            # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
             # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
             import bcrypt
             try:
-                # Get the actual hash from DB to verify
+                # Get the actual hash from DB to verify (after commit)
                 cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
                 db_hash_row = cur.fetchone()
                 if db_hash_row and db_hash_row[0]:
@@ -2691,6 +2693,7 @@ def change_user_password(user_id):
                     if not test_check:
                         print(f"[ERROR] Password hash verification FAILED! Password does not match hash!")
                         print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
+                        print(f"[ERROR] DB hash type: {type(db_hash)}, DB hash value: {db_hash[:50] if db_hash else 'NULL'}")
                     else:
                         print(f"[INFO] Password hash verification PASSED! Login should work!")
                 else:
@@ -2700,7 +2703,6 @@ def change_user_password(user_id):
                 import traceback
                 traceback.print_exc()
             
-            conn.commit()
             affected_rows = cur.rowcount
             cur.close()
             conn.close()
@@ -2927,11 +2929,13 @@ def create_user():
                 print(f"[DEBUG] Verified updated password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
                 print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
             
-            # CRITICAL: Verify password works by testing with bcrypt.checkpw
+            conn.commit()
+            
+            # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
             # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
             import bcrypt
             try:
-                # Get the actual hash from DB to verify
+                # Get the actual hash from DB to verify (after commit)
                 cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
                 db_hash_row = cur.fetchone()
                 if db_hash_row and db_hash_row[0]:
@@ -2947,6 +2951,7 @@ def create_user():
                     if not test_check:
                         print(f"[ERROR] Password hash verification FAILED! Password does not match hash!")
                         print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
+                        print(f"[ERROR] DB hash type: {type(db_hash)}, DB hash value: {db_hash[:50] if db_hash else 'NULL'}")
                     else:
                         print(f"[INFO] Password hash verification PASSED! Login should work!")
                 else:
@@ -2956,7 +2961,6 @@ def create_user():
                 import traceback
                 traceback.print_exc()
             
-            conn.commit()
             cur.close()
             conn.close()
             print(f"[INFO] Password hash updated successfully!")
@@ -3055,11 +3059,13 @@ def create_user():
             ON CONFLICT (user_id) DO UPDATE SET vector = EXCLUDED.vector
         """, (user_id, search_vector))
         
-        # CRITICAL: Verify password works by testing with bcrypt.checkpw
+        conn.commit()
+        
+        # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
         # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
         import bcrypt
         try:
-            # Get the actual hash from DB to verify
+            # Get the actual hash from DB to verify (after commit)
             cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
             db_hash_row = cur.fetchone()
             if db_hash_row and db_hash_row[0]:
@@ -3075,6 +3081,7 @@ def create_user():
                 if not test_check:
                     print(f"[ERROR] Password hash verification FAILED! Password '{password}' does not match hash!")
                     print(f"[ERROR] This means login will fail! Check Matrix Synapse password hash format!")
+                    print(f"[ERROR] DB hash type: {type(db_hash)}, DB hash value: {db_hash[:50] if db_hash else 'NULL'}")
                 else:
                     print(f"[INFO] Password hash verification PASSED! Login should work!")
             else:
@@ -3084,7 +3091,6 @@ def create_user():
             import traceback
             traceback.print_exc()
         
-        conn.commit()
         cur.close()
         conn.close()
         
