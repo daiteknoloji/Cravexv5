@@ -14,6 +14,7 @@ BEGIN;
 DELETE FROM local_current_membership; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM sliding_sync_membership_snapshots; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM sliding_sync_joined_rooms; -- ÖNCE BU! events'e referans veriyor
+DELETE FROM event_forward_extremities; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM current_state_events;
 DELETE FROM event_edges;
 DELETE FROM event_auth;
@@ -143,6 +144,7 @@ BEGIN;
 DELETE FROM local_current_membership; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM sliding_sync_membership_snapshots; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM sliding_sync_joined_rooms; -- ÖNCE BU! events'e referans veriyor
+DELETE FROM event_forward_extremities; -- ÖNCE BU! events'e referans veriyor
 DELETE FROM current_state_events;
 DELETE FROM event_edges;
 DELETE FROM event_auth;
