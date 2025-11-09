@@ -1872,10 +1872,44 @@ def toggle_user_deactivate(user_id):
                 cur.execute("DELETE FROM access_tokens WHERE user_id = %s", (user_id,))
                 cur.execute("DELETE FROM devices WHERE user_id = %s", (user_id,))
             else:
-                # Activate: Only update database to preserve password
-                # Matrix API requires password when activating, which we don't have
-                # So we only update database - Matrix will sync automatically
-                print(f"[INFO] Activating user via database only (to preserve password): {user_id}")
+                # Activate via Synapse Admin API v2
+                # First get user data to preserve all fields including password
+                api_get_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
+                get_response = requests.get(api_get_url, headers=headers, timeout=10)
+                
+                if get_response.status_code == 200:
+                    user_data = get_response.json()
+                    # Only change deactivated status, preserve everything else (including password)
+                    user_data['deactivated'] = False
+                    
+                    # Update user via Admin API
+                    api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
+                    response = requests.put(
+                        api_url, 
+                        headers=headers, 
+                        json=user_data,
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        print(f"[INFO] User activated via Matrix API (password preserved): {user_id}")
+                    else:
+                        print(f"[WARN] Matrix API activate failed: {response.status_code} - {response.text[:200]}")
+                else:
+                    # If can't get user data, try simple update (may require password reset)
+                    print(f"[WARN] Could not get user data: {get_response.status_code}, trying simple activate...")
+                    api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
+                    response = requests.put(
+                        api_url, 
+                        headers=headers, 
+                        json={'deactivated': False},
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        print(f"[INFO] User activated via Matrix API: {user_id}")
+                    else:
+                        print(f"[WARN] Matrix API activate failed: {response.status_code} - {response.text[:200]}")
         
         # Update database
         cur.execute("""
