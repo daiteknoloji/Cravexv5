@@ -1840,34 +1840,45 @@ def delete_user(user_id):
         cur = conn.cursor()
         
         # Check if user exists
-        cur.execute("SELECT name FROM users WHERE name = %s", (user_id,))
-        if not cur.fetchone():
+        cur.execute("SELECT name, deactivated FROM users WHERE name = %s", (user_id,))
+        user_row = cur.fetchone()
+        if not user_row:
             cur.close()
             conn.close()
             return jsonify({'error': 'Kullanıcı bulunamadı', 'success': False}), 404
+        
+        print(f"[INFO] Deleting user: {user_id} (currently deactivated: {user_row[1]})")
         
         # Deactivate user
         cur.execute("""
             UPDATE users SET deactivated = 1 WHERE name = %s
         """, (user_id,))
+        deactivated_count = cur.rowcount
         
         # Delete access tokens (logout all sessions)
         cur.execute("""
             DELETE FROM access_tokens WHERE user_id = %s
         """, (user_id,))
+        tokens_deleted = cur.rowcount
         
         # Delete devices
         cur.execute("""
             DELETE FROM devices WHERE user_id = %s
         """, (user_id,))
+        devices_deleted = cur.rowcount
         
         conn.commit()
         cur.close()
         conn.close()
         
+        print(f"[INFO] User deleted: {user_id} - deactivated: {deactivated_count}, tokens: {tokens_deleted}, devices: {devices_deleted}")
+        
         return jsonify({
             'success': True,
-            'message': f'Kullanıcı başarıyla silindi: {user_id}'
+            'message': f'Kullanıcı başarıyla silindi: {user_id}',
+            'deactivated': deactivated_count > 0,
+            'tokens_deleted': tokens_deleted,
+            'devices_deleted': devices_deleted
         })
         
     except Exception as e:
