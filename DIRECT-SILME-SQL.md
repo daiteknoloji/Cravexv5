@@ -10,10 +10,11 @@
 BEGIN;
 
 -- 1. Bağımlı tabloları sil (events'e referans verenler)
+-- Not: Olmayan tablolar hata vermez, sadece atlanır
 DELETE FROM current_state_events;
 DELETE FROM event_edges;
 DELETE FROM event_auth;
-DELETE FROM event_reference_hashes;
+-- DELETE FROM event_reference_hashes; -- Bu tablo yoksa bu satırı kaldırın veya yorum satırı yapın
 DELETE FROM event_relations;
 DELETE FROM event_to_state_groups;
 DELETE FROM rejected_events;
@@ -135,10 +136,11 @@ VACUUM FULL ANALYZE rooms;
 BEGIN;
 
 -- 1. Bağımlı tabloları sil (events'e referans verenler)
+-- Not: Olmayan tablolar hata vermez, sadece atlanır
 DELETE FROM current_state_events;
 DELETE FROM event_edges;
 DELETE FROM event_auth;
-DELETE FROM event_reference_hashes;
+-- DELETE FROM event_reference_hashes; -- Bu tablo yoksa bu satırı kaldırın
 DELETE FROM event_relations;
 DELETE FROM event_to_state_groups;
 DELETE FROM rejected_events;
