@@ -1921,53 +1921,78 @@ def add_room_member(room_id):
                 print(f"Admin join attempt failed: {admin_err}")
                 # Continue anyway
         
-        # Step 2: First try to INVITE the user (so they get notification)
+        # Step 2: Try Matrix Client API v3 JOIN (creates real join event with notification)
         try:
-            # Use Client API to invite (sends notification)
-            invite_url = f'{synapse_url}/_matrix/client/r0/rooms/{room_id}/invite'
+            # First, try to INVITE the user (so they get notification)
+            invite_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
             invite_payload = {'user_id': user_id}
             
             print(f"[1] Sending invite to {user_id} in room {room_id}...")
             invite_response = requests.post(invite_url, headers=headers, json=invite_payload, timeout=5)
             print(f"[1] Invite result: {invite_response.status_code} - {invite_response.text[:200]}")
             
-            if invite_response.status_code == 200:
-                # Invite successful - now auto-accept by joining them
-                print(f"[2] Now force-joining {user_id}...")
-                join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
-                join_response = requests.post(join_url, headers=headers, json={'user_id': user_id}, timeout=5)
-                print(f"[2] Force-join result: {join_response.status_code} - {join_response.text[:200]}")
-                
-                if join_response.status_code == 200:
-                    return jsonify({
-                        'message': f'✅ {user_id} added and joined! Refresh Element Web to see.',
-                        'success': True,
-                        'method': 'matrix_api'
-                    })
-                else:
-                    # Invite sent but couldn't force join
-                    return jsonify({
-                        'message': f'📧 Invite sent to {user_id}! They need to accept in Element Web.',
-                        'success': True,
-                        'method': 'invite_only'
-                    })
+            # Step 3: Try Admin API join first (force join user)
+            admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
+            print(f"[2] Trying Admin API force-join for {user_id}...")
+            admin_api_response = requests.post(admin_join_url, headers=headers, json={'user_id': user_id}, timeout=5)
+            print(f"[2] Admin API force-join result: {admin_api_response.status_code} - {admin_api_response.text[:200]}")
             
-            # If invite failed, try direct admin join
-            print(f"[3] Invite failed, trying direct admin join...")
-            api_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
-            response = requests.post(api_url, headers=headers, json={'user_id': user_id}, timeout=5)
-            print(f"[3] Direct join result: {response.status_code} - {response.text[:200]}")
-            
-            if response.status_code == 200:
+            if admin_api_response.status_code == 200:
+                # Success! User joined via Admin API - this creates a join event
                 return jsonify({
-                    'message': f'✅ {user_id} force-joined! Refresh Element Web.',
+                    'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
                     'success': True,
-                    'method': 'admin_join'
+                    'method': 'admin_api_join'
                 })
-            elif response.status_code == 403:
-                # 403 means admin doesn't have permission - often happens in DM/private rooms
-                # Fallback: Try database insert (won't sync immediately but works)
-                print(f"Matrix API 403, trying database fallback...")
+            
+            # Step 4: If Admin API failed, try Client API v3 JOIN with user's token
+            # This creates a real join event with notification
+            join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+            
+            # Get user's access token to join as them
+            print(f"[3] Admin API failed, trying to get user token for Client API join...")
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                (user_id,)
+            )
+            user_token_row = cur.fetchone()
+            user_token = user_token_row[0] if user_token_row else None
+            cur.close()
+            conn.close()
+            
+            if user_token:
+                # Join as the user (they will get notification)
+                user_headers = {
+                    'Authorization': f'Bearer {user_token}',
+                    'Content-Type': 'application/json'
+                }
+                print(f"[3] Joining as user via Client API v3...")
+                user_join_response = requests.post(join_url, headers=user_headers, json={}, timeout=5)
+                print(f"[3] User Client API join result: {user_join_response.status_code} - {user_join_response.text[:200]}")
+                
+                if user_join_response.status_code == 200:
+                    return jsonify({
+                        'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
+                        'success': True,
+                        'method': 'client_api_v3_join'
+                    })
+            
+            # Step 5: If invite was sent, inform user they need to accept
+            if invite_response.status_code == 200:
+                return jsonify({
+                    'message': f'📧 {user_id} kullanıcısına davet gönderildi! Element Web\'de kabul etmesi gerekiyor.',
+                    'success': True,
+                    'method': 'invite_sent'
+                })
+            
+            # Step 6: If all methods failed, try database fallback (last resort)
+            # Check if Admin API returned 403 (no permission)
+            if admin_api_response and admin_api_response.status_code == 403:
+                # 403 = Admin doesn't have permission (often DM/private rooms)
+                # Last resort: Database insert (no notification, but works)
+                print(f"[4] Admin API 403, using database fallback...")
                 
                 try:
                     conn = get_db_connection()
@@ -1988,24 +2013,24 @@ def add_room_member(room_id):
                     
                     return jsonify({
                         'success': True,
-                        'message': f'Member added via database (bypass). User may need to refresh Element Web to see the room.',
-                        'method': 'database',
-                        'note': 'Added directly to database - real-time sync may not work immediately'
+                        'message': f'⚠️ {user_id} veritabanına eklendi. Element Web\'de refresh yapması gerekebilir.',
+                        'method': 'database_fallback',
+                        'warning': 'Bildirim gönderilemedi - kullanıcı Element Web\'i yenilemeli'
                     })
                     
                 except Exception as db_err:
                     print(f"Database fallback also failed: {db_err}")
                     return jsonify({
-                        'error': f'Cannot add member. This is a private DM room and admin cannot force join.',
+                        'error': f'Üye eklenemedi. Bu özel bir DM odası olabilir ve admin yetkisi yok.',
                         'success': False,
-                        'suggestion': 'Ask existing room members to invite the user via Element Web.'
+                        'suggestion': 'Mevcut oda üyelerinden birinin Element Web üzerinden kullanıcıyı davet etmesi gerekiyor.'
                     }), 403
             else:
                 return jsonify({
-                    'error': f'Matrix API error: {response.status_code}',
+                    'error': f'Matrix API hatası: {admin_api_response.status_code}',
                     'success': False,
-                    'details': response.text
-                }), response.status_code
+                    'details': admin_api_response.text[:200]
+                }), admin_api_response.status_code
                 
         except Exception as api_error:
             print(f"Matrix API error: {api_error}")
