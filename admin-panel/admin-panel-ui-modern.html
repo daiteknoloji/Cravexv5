@@ -2344,13 +2344,8 @@
             }
         }
         
-        // Deactivate Modal Functions
         async function deleteUser(userId) {
-            if (!confirm(`${userId} kullanıcısını SİLMEK istediğinize emin misiniz?\n\nBu işlem geri alınamaz!`)) {
-                return;
-            }
-            
-            if (!confirm('Son bir kez daha onaylıyor musunuz? Kullanıcı kalıcı olarak silinecek!')) {
+            if (!confirm(`${userId} kullanıcısını sistemden silmek istediğinizden emin misiniz?\n\nKullanıcı deaktif edilecek ve tüm oturumları kapatılacak. Veritabanından silinmeyecek.`)) {
                 return;
             }
             
