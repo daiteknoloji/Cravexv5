@@ -601,12 +601,92 @@
             -webkit-overflow-scrolling: touch;
             width: 100%;
             margin-bottom: 20px;
+            position: relative;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+        
+        .table-wrapper::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .table-wrapper::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+        
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
         }
         
         table {
             width: 100%;
             min-width: 600px; /* Minimum width for tables */
             border-collapse: collapse;
+            white-space: nowrap;
+        }
+        
+        /* Mobile table optimizations */
+        @media (max-width: 768px) {
+            .table-wrapper {
+                margin-bottom: 16px;
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+            }
+            
+            table {
+                min-width: 800px; /* Wider for mobile scrolling */
+                font-size: 12px;
+            }
+            
+            table th,
+            table td {
+                padding: 10px 8px;
+                white-space: nowrap;
+            }
+            
+            table th {
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            /* Make some columns more compact on mobile */
+            table td:nth-child(1),
+            table th:nth-child(1) {
+                min-width: 120px;
+            }
+            
+            table td:nth-child(2),
+            table th:nth-child(2) {
+                min-width: 150px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .table-wrapper {
+                margin-bottom: 12px;
+            }
+            
+            table {
+                min-width: 900px; /* Even wider for very small screens */
+                font-size: 11px;
+            }
+            
+            table th,
+            table td {
+                padding: 8px 6px;
+            }
+            
+            table th {
+                font-size: 10px;
+            }
         }
         
         /* Responsive Design */
@@ -2070,7 +2150,7 @@
                 return;
             }
             
-            let html = '<table><thead><tr><th>Oda Adı</th><th>Oluşturan</th><th>Üye Sayısı</th><th>Mesaj</th><th>Tür</th></tr></thead><tbody>';
+            let html = '<div class="table-wrapper"><table><thead><tr><th>Oda Adı</th><th>Oluşturan</th><th>Üye Sayısı</th><th>Mesaj</th><th>Tür</th></tr></thead><tbody>';
             
             pageRooms.forEach(room => {
                 const roomType = room.member_count === 2 ? '<span class="badge badge-info"><i class="fas fa-comment"></i> DM</span>' :
@@ -2091,7 +2171,7 @@
                 `;
             });
             
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             container.innerHTML = html;
             
             // Update pagination
@@ -2699,7 +2779,7 @@
                 return;
             }
             
-            let html = '<table><thead><tr><th>Kullanıcı ID</th><th>Görünen Ad</th><th>Roller</th><th>Odalar</th><th>Aktif Oturum</th><th>İşlemler</th></tr></thead><tbody>';
+            let html = '<div class="table-wrapper"><table><thead><tr><th>Kullanıcı ID</th><th>Görünen Ad</th><th>Roller</th><th>Odalar</th><th>Aktif Oturum</th><th>İşlemler</th></tr></thead><tbody>';
             
             pageUsers.forEach(user => {
                 const adminBadge = user.admin ? '<span class="badge badge-info"><i class="fas fa-crown"></i> Admin</span>' : '<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">Kullanıcı</span>';
@@ -2726,7 +2806,7 @@
                 `;
             });
             
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             container.innerHTML = html;
             
             // Update pagination info
@@ -2808,7 +2888,7 @@
                 return;
             }
             
-            let html = '<table><thead><tr><th>Kullanıcı ID</th><th>Görünen Ad</th><th>Roller</th><th>Odalar</th><th>Oluşturulma</th></tr></thead><tbody>';
+            let html = '<div class="table-wrapper"><table><thead><tr><th>Kullanıcı ID</th><th>Görünen Ad</th><th>Roller</th><th>Odalar</th><th>Oluşturulma</th></tr></thead><tbody>';
             
             pageUsers.forEach(user => {
                 const adminBadge = user.admin ? '<span class="badge badge-info"><i class="fas fa-crown"></i> Admin</span>' : '<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">Kullanıcı</span>';
@@ -2824,7 +2904,7 @@
                 `;
             });
             
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             container.innerHTML = html;
             
             // Update pagination info
@@ -3418,7 +3498,7 @@
                     `;
                 });
                 
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
                 container.innerHTML = html;
                 
             } catch (error) {
