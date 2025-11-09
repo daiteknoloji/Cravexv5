@@ -1878,23 +1878,11 @@ def toggle_user_deactivate(user_id):
                     cur.execute("DELETE FROM access_tokens WHERE user_id = %s", (user_id,))
                     cur.execute("DELETE FROM devices WHERE user_id = %s", (user_id,))
                 else:
-                    # Activate via Synapse Admin API v2
-                    api_url = f'{synapse_url}/_synapse/admin/v2/users/{user_id}'
-                    try:
-                        response = requests.put(
-                            api_url, 
-                            headers=headers, 
-                            json={'deactivated': False},
-                            timeout=5  # Reduced timeout
-                        )
-                        
-                        if response.status_code == 200:
-                            print(f"[INFO] User activated via Matrix API: {user_id}")
-                            matrix_api_success = True
-                        else:
-                            print(f"[WARN] Matrix API activate failed: {response.status_code} - {response.text[:200]}")
-                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-                        print(f"[WARN] Matrix API timeout/connection error (will use database only): {e}")
+                    # Activate: Only update database to preserve password
+                    # Matrix API may reset password when activating, so we skip it
+                    # Matrix Synapse reads from database, so database update is sufficient
+                    print(f"[INFO] Activating user via database only (to preserve password): {user_id}")
+                    # Don't use Matrix API for activation to avoid password issues
             except Exception as api_error:
                 print(f"[WARN] Matrix API error (will use database only): {api_error}")
         
