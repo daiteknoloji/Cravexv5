@@ -1690,11 +1690,21 @@
         function showPage(pageName) {
             // Update navigation
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            // Find and activate the correct nav item
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                const onclick = item.getAttribute('onclick');
+                if (onclick && onclick.includes(`'${pageName}'`)) {
+                    item.classList.add('active');
+                }
+            });
             
             // Update pages
             document.querySelectorAll('.page-view').forEach(page => page.classList.remove('active'));
-            document.getElementById(`page-${pageName}`).classList.add('active');
+            const targetPage = document.getElementById(`page-${pageName}`);
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
             
             // Update header title
             const titles = {
@@ -1704,9 +1714,18 @@
                 'deleted-users': 'Silinen Kullanıcılar',
                 'messages': 'Mesaj Görüntüleme'
             };
-            document.getElementById('pageTitle').textContent = titles[pageName] || pageName;
+            const titleElement = document.getElementById('pageTitle');
+            if (titleElement) {
+                titleElement.textContent = titles[pageName] || pageName;
+            }
             
             currentPage = pageName;
+            
+            // Close mobile sidebar when navigating
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar) sidebar.classList.remove('mobile-visible');
+            }
             
             // Load page data
             if (pageName === 'rooms') loadRooms();
