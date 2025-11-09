@@ -9,19 +9,30 @@
 ```sql
 BEGIN;
 
--- Mesajları sil
+-- 1. Bağımlı tabloları sil (events'e referans verenler)
+DELETE FROM current_state_events;
+DELETE FROM event_edges;
+DELETE FROM event_auth;
+DELETE FROM event_reference_hashes;
+DELETE FROM event_relations;
+DELETE FROM event_to_state_groups;
+DELETE FROM rejected_events;
+DELETE FROM state_events;
+DELETE FROM state_groups_state;
+
+-- 2. Redactions
 DELETE FROM redactions;
-DELETE FROM event_json WHERE json::json->>'type' = 'm.room.message';
-DELETE FROM events WHERE type = 'm.room.message';
 
--- Oda event'lerini sil
-DELETE FROM event_json WHERE room_id IS NOT NULL;
-DELETE FROM events WHERE room_id IS NOT NULL;
+-- 3. Event JSON'ları
+DELETE FROM event_json;
 
--- Oda üyeliklerini sil
+-- 4. Events (artık güvenle silinebilir)
+DELETE FROM events;
+
+-- 5. Oda üyelikleri
 DELETE FROM room_memberships;
 
--- Odaları sil
+-- 6. Odalar
 DELETE FROM rooms;
 
 -- Kontrol
@@ -123,13 +134,30 @@ VACUUM FULL ANALYZE rooms;
 ```sql
 BEGIN;
 
--- Önce redactions varsa sil (yoksa hata vermez)
-DELETE FROM redactions WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'redactions');
+-- 1. Bağımlı tabloları sil (events'e referans verenler)
+DELETE FROM current_state_events;
+DELETE FROM event_edges;
+DELETE FROM event_auth;
+DELETE FROM event_reference_hashes;
+DELETE FROM event_relations;
+DELETE FROM event_to_state_groups;
+DELETE FROM rejected_events;
+DELETE FROM state_events;
+DELETE FROM state_groups_state;
 
--- Diğer tabloları sil
+-- 2. Redactions
+DELETE FROM redactions;
+
+-- 3. Event JSON'ları
 DELETE FROM event_json;
+
+-- 4. Events (artık güvenle silinebilir)
 DELETE FROM events;
+
+-- 5. Oda üyelikleri
 DELETE FROM room_memberships;
+
+-- 6. Odalar
 DELETE FROM rooms;
 
 -- Kontrol
