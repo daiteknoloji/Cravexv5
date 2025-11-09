@@ -2076,11 +2076,16 @@ def change_user_password(user_id):
             
             # Hash password using bcrypt (Matrix Synapse format)
             import bcrypt
+            # Generate salt with 12 rounds (Matrix Synapse default)
             salt = bcrypt.gensalt(rounds=12)
-            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), salt)
-            # Ensure it's stored as string
-            if isinstance(password_hash, bytes):
-                password_hash = password_hash.decode('utf-8')
+            # Hash the password
+            password_hash_bytes = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+            # Convert to string (Matrix Synapse stores as TEXT/VARCHAR)
+            password_hash = password_hash_bytes.decode('utf-8')
+            # Verify hash format
+            if not password_hash.startswith('$2b$12$'):
+                print(f"[ERROR] Invalid hash format: {password_hash[:20]}...")
+            print(f"[DEBUG] Password hash created: {password_hash[:30]}... (length: {len(password_hash)})")
             
             # Update password in database
             cur.execute("""
@@ -2235,14 +2240,18 @@ def create_user():
             return jsonify({'error': 'User already exists', 'success': False}), 409
         
         # Hash password using bcrypt (Matrix Synapse format)
-        # Matrix Synapse uses bcrypt with $2b$ prefix
+        # Matrix Synapse uses bcrypt with $2b$ prefix and expects string format
         import bcrypt
+        # Generate salt with 12 rounds (Matrix Synapse default)
         salt = bcrypt.gensalt(rounds=12)
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), salt)
-        # Ensure it's stored as string (Matrix Synapse expects this)
-        if isinstance(password_hash, bytes):
-            password_hash = password_hash.decode('utf-8')
-        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:30]}...")
+        # Hash the password
+        password_hash_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
+        # Convert to string (Matrix Synapse stores as TEXT/VARCHAR)
+        password_hash = password_hash_bytes.decode('utf-8')
+        # Verify hash format (should start with $2b$12$)
+        if not password_hash.startswith('$2b$12$'):
+            print(f"[ERROR] Invalid hash format: {password_hash[:20]}...")
+        print(f"[DEBUG] Created user {user_id} with password hash: {password_hash[:30]}... (length: {len(password_hash)})")
         
         # Insert user (with all required columns)
         creation_ts = int(time.time())  # Synapse uses SECONDS, not milliseconds
