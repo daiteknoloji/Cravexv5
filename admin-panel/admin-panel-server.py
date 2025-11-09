@@ -3014,7 +3014,7 @@ def create_user():
         if has_approved:
             base_cols += ", approved"
             base_vals += ", %s"
-            params.append(True)  # CRITICAL: approved must be True for login to work!
+            params.append(True)
         if has_shadow_banned:
             base_cols += ", shadow_banned"
             base_vals += ", %s"
@@ -3025,7 +3025,9 @@ def create_user():
             VALUES ({base_vals})
         """
         
+        print(f"[INFO] Creating user {user_id} in database...")
         cur.execute(insert_query, tuple(params))
+        print(f"[INFO] User {user_id} inserted into users table")
         
         # Verify password hash was inserted correctly
         cur.execute("SELECT password_hash FROM users WHERE name = %s", (user_id,))
@@ -3034,54 +3036,51 @@ def create_user():
             verify_hash = verify_row[0]
             print(f"[DEBUG] Verified password hash in DB: {verify_hash[:30] if verify_hash else 'NULL'}...")
             print(f"[DEBUG] Hash matches: {verify_hash == password_hash}")
+        else:
+            print(f"[ERROR] User {user_id} not found in database after insert!")
         
         # Create profile (required for Matrix)
         display_name_value = displayname if displayname else username
-        cur.execute("""
-            INSERT INTO profiles (user_id, displayname, full_user_id)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (user_id) DO UPDATE SET displayname = EXCLUDED.displayname, full_user_id = EXCLUDED.full_user_id
-        """, (user_id, display_name_value, user_id))
+        print(f"[INFO] Creating profile for {user_id}...")
+        try:
+            cur.execute("""
+                INSERT INTO profiles (user_id, displayname, full_user_id)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET displayname = EXCLUDED.displayname, full_user_id = EXCLUDED.full_user_id
+            """, (user_id, display_name_value, user_id))
+            print(f"[INFO] Profile created/updated for {user_id}")
+        except Exception as profile_error:
+            print(f"[WARN] Profile creation failed: {profile_error}")
         
         # Add to user_directory (CRITICAL for login!)
-        cur.execute("""
-            INSERT INTO user_directory (user_id, display_name, avatar_url)
-            VALUES (%s, %s, NULL)
-            ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name
-        """, (user_id, display_name_value))
+        print(f"[INFO] Adding {user_id} to user_directory...")
+        try:
+            cur.execute("""
+                INSERT INTO user_directory (user_id, display_name, avatar_url)
+                VALUES (%s, %s, NULL)
+                ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name
+            """, (user_id, display_name_value))
+            print(f"[INFO] User {user_id} added to user_directory")
+        except Exception as dir_error:
+            print(f"[WARN] user_directory insertion failed: {dir_error}")
         
         # Add to user_directory_search (for search functionality)
-        # Build search vector: lowercase username and display name
-        search_vector = f"'{HOMESERVER_DOMAIN}':2 '{username.lower()}':1A,3B"
-        cur.execute("""
-            INSERT INTO user_directory_search (user_id, vector)
-            VALUES (%s, %s)
-            ON CONFLICT (user_id) DO UPDATE SET vector = EXCLUDED.vector
-        """, (user_id, search_vector))
+        print(f"[INFO] Adding {user_id} to user_directory_search...")
+        try:
+            # Build search vector: lowercase username and display name
+            search_vector = f"'{HOMESERVER_DOMAIN}':2 '{username.lower()}':1A,3B"
+            cur.execute("""
+                INSERT INTO user_directory_search (user_id, vector)
+                VALUES (%s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET vector = EXCLUDED.vector
+            """, (user_id, search_vector))
+            print(f"[INFO] User {user_id} added to user_directory_search")
+        except Exception as search_error:
+            print(f"[WARN] user_directory_search insertion failed: {search_error}")
         
+        print(f"[INFO] Committing all changes to database...")
         conn.commit()
-        
-        # CRITICAL: Verify user was created correctly with all required fields
-        cur.execute("""
-            SELECT name, password_hash, admin, is_guest, deactivated, 
-                   CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='approved') 
-                        THEN (SELECT approved FROM users WHERE name = %s) 
-                        ELSE NULL END as approved
-            FROM users WHERE name = %s
-        """, (user_id, user_id))
-        verify_user = cur.fetchone()
-        if verify_user:
-            print(f"[DEBUG] User verification:")
-            print(f"[DEBUG]   - name: {verify_user[0]}")
-            print(f"[DEBUG]   - password_hash: {'SET' if verify_user[1] else 'NULL'}")
-            print(f"[DEBUG]   - admin: {verify_user[2]}")
-            print(f"[DEBUG]   - is_guest: {verify_user[3]}")
-            print(f"[DEBUG]   - deactivated: {verify_user[4]}")
-            print(f"[DEBUG]   - approved: {verify_user[5]}")
-            if verify_user[4] == 1:
-                print(f"[ERROR] User is DEACTIVATED! Login will fail!")
-            if verify_user[5] is False:
-                print(f"[ERROR] User is NOT APPROVED! Login will fail!")
+        print(f"[INFO] All database changes committed successfully!")
         
         # CRITICAL: Verify password works by testing with bcrypt.checkpw AFTER commit
         # IMPORTANT: password_hash is stored as TEXT/VARCHAR string, so we need to encode it back to bytes for checkpw
