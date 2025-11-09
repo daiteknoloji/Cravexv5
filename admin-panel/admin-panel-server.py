@@ -1806,88 +1806,13 @@ def toggle_user_admin(user_id):
 @app.route('/api/users/<user_id>/deactivate', methods=['PUT'])
 @login_required
 def toggle_user_deactivate(user_id):
-    """Toggle user deactivated status - Matrix API + Database cleanup"""
+    """Toggle user deactivated status (activate/deactivate)"""
     try:
         deactivate = request.json.get('deactivated', False)
-        import requests
         
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # If deactivating, use Matrix Admin API + cleanup
-        if deactivate:
-            # First, try Matrix Admin API for proper deactivation
-            try:
-                # Get admin token
-                cur.execute(
-                    "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
-                    (ADMIN_USER_ID,)
-                )
-                token_row = cur.fetchone()
-                admin_token = token_row[0] if token_row else None
-                
-                # If no token, try auto-login
-                if not admin_token:
-                    admin_username = os.getenv('ADMIN_USERNAME', 'admin')
-                    admin_password = os.getenv('ADMIN_PASSWORD')
-                    synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-                    
-                    if admin_password:
-                        print(f"[INFO] Attempting auto-login for deactivate...")
-                        try:
-                            login_response = requests.post(
-                                f'{synapse_url}/_matrix/client/v3/login',
-                                json={
-                                    'type': 'm.login.password',
-                                    'identifier': {'type': 'm.id.user', 'user': admin_username},
-                                    'password': admin_password
-                                },
-                                timeout=10
-                            )
-                            
-                            if login_response.status_code == 200:
-                                admin_token = login_response.json().get('access_token')
-                                print(f"[INFO] Auto-login successful!")
-                        except Exception as login_error:
-                            print(f"[WARN] Auto-login failed: {login_error}")
-                
-                # Use Matrix Admin API to deactivate
-                if admin_token:
-                    synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
-                    headers = {
-                        'Authorization': f'Bearer {admin_token}',
-                        'Content-Type': 'application/json'
-                    }
-                    
-                    # Deactivate via Synapse Admin API
-                    api_url = f'{synapse_url}/_synapse/admin/v1/deactivate/{user_id}'
-                    response = requests.post(
-                        api_url, 
-                        headers=headers, 
-                        json={'erase': False},
-                        timeout=10
-                    )
-                    
-                    if response.status_code == 200:
-                        print(f"[INFO] User deactivated via Matrix API: {user_id}")
-                    else:
-                        print(f"[WARN] Matrix API deactivate failed: {response.status_code} - {response.text[:200]}")
-            except Exception as api_error:
-                print(f"[WARN] Matrix API error: {api_error}")
-            
-            # ALWAYS delete access tokens and devices (even if API fails)
-            # This ensures user cannot continue operations
-            cur.execute("""
-                DELETE FROM access_tokens WHERE user_id = %s
-            """, (user_id,))
-            
-            cur.execute("""
-                DELETE FROM devices WHERE user_id = %s
-            """, (user_id,))
-            
-            print(f"[INFO] Deleted all access tokens and devices for {user_id}")
-        
-        # Update deactivated status in database
         cur.execute("""
             UPDATE users SET deactivated = %s WHERE name = %s
         """, (1 if deactivate else 0, user_id))
@@ -1896,23 +1821,14 @@ def toggle_user_deactivate(user_id):
         cur.close()
         conn.close()
         
-        if deactivate:
-            return jsonify({
-                'success': True,
-                'message': f'Kullanıcı pasif yapıldı - Tüm oturumlar kapatıldı ve cihazlar silindi',
-                'deactivated': True
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'message': f'Kullanıcı aktif yapıldı',
-                'deactivated': False
-            })
+        return jsonify({
+            'success': True,
+            'message': f'Kullanıcı {"pasif yapıldı" if deactivate else "aktif yapıldı"}',
+            'deactivated': bool(deactivate)
+        })
         
     except Exception as e:
         print(f"[HATA] PUT /api/users/{user_id}/deactivate - {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e), 'success': False}), 500
 
 @app.route('/api/users/<user_id>', methods=['DELETE'])
