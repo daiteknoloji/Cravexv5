@@ -2824,6 +2824,109 @@ def export_data():
         print(f"[HATA] /api/export - {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/media/download/<server_name>/<path:media_id>')
+@login_required
+def proxy_media_download(server_name, media_id):
+    """Proxy media download requests to Matrix Synapse"""
+    try:
+        synapse_url = os.getenv('SYNAPSE_URL', f'https://{server_name}')
+        media_url = f'{synapse_url}/_matrix/media/r0/download/{server_name}/{media_id}'
+        
+        # Forward request to Matrix Synapse
+        response = requests.get(media_url, stream=True, timeout=30, allow_redirects=True)
+        
+        if response.status_code == 200:
+            # Get content type from response
+            content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            
+            # Stream the response
+            def generate():
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            
+            return Response(
+                generate(),
+                mimetype=content_type,
+                headers={
+                    'Content-Disposition': f'inline; filename="{media_id}"',
+                    'Cache-Control': 'public, max-age=3600'
+                }
+            )
+        else:
+            return jsonify({
+                'errcode': 'M_NOT_FOUND',
+                'error': f'Media not found: {response.status_code}'
+            }), response.status_code
+            
+    except requests.exceptions.RequestException as e:
+        print(f"[HATA] Media proxy error: {str(e)}")
+        return jsonify({
+            'errcode': 'M_UNKNOWN',
+            'error': f'Media proxy error: {str(e)}'
+        }), 500
+    except Exception as e:
+        print(f"[HATA] Media proxy error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'errcode': 'M_UNKNOWN',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/media/thumbnail/<server_name>/<path:media_id>')
+@login_required
+def proxy_media_thumbnail(server_name, media_id):
+    """Proxy media thumbnail requests to Matrix Synapse"""
+    try:
+        synapse_url = os.getenv('SYNAPSE_URL', f'https://{server_name}')
+        width = request.args.get('width', '800')
+        height = request.args.get('height', '600')
+        method = request.args.get('method', 'scale')
+        
+        thumbnail_url = f'{synapse_url}/_matrix/media/r0/thumbnail/{server_name}/{media_id}?width={width}&height={height}&method={method}'
+        
+        # Forward request to Matrix Synapse
+        response = requests.get(thumbnail_url, stream=True, timeout=30, allow_redirects=True)
+        
+        if response.status_code == 200:
+            # Get content type from response
+            content_type = response.headers.get('Content-Type', 'image/jpeg')
+            
+            # Stream the response
+            def generate():
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            
+            return Response(
+                generate(),
+                mimetype=content_type,
+                headers={
+                    'Cache-Control': 'public, max-age=3600'
+                }
+            )
+        else:
+            return jsonify({
+                'errcode': 'M_NOT_FOUND',
+                'error': f'Thumbnail not found: {response.status_code}'
+            }), response.status_code
+            
+    except requests.exceptions.RequestException as e:
+        print(f"[HATA] Thumbnail proxy error: {str(e)}")
+        return jsonify({
+            'errcode': 'M_UNKNOWN',
+            'error': f'Thumbnail proxy error: {str(e)}'
+        }), 500
+    except Exception as e:
+        print(f"[HATA] Thumbnail proxy error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'errcode': 'M_UNKNOWN',
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     print("")
     print("=" * 60)
