@@ -1945,54 +1945,52 @@ def add_room_member(room_id):
                     'method': 'admin_api_join'
                 })
             
-            # Step 4: If Admin API failed, try Client API v3 JOIN with user's token
-            # This creates a real join event with notification
-            join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
-            
-            # Get user's access token to join as them
-            print(f"[3] Admin API failed, trying to get user token for Client API join...")
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
-                (user_id,)
-            )
-            user_token_row = cur.fetchone()
-            user_token = user_token_row[0] if user_token_row else None
-            cur.close()
-            conn.close()
-            
-            if user_token:
-                # Join as the user (they will get notification)
-                user_headers = {
-                    'Authorization': f'Bearer {user_token}',
-                    'Content-Type': 'application/json'
-                }
-                print(f"[3] Joining as user via Client API v3...")
-                user_join_response = requests.post(join_url, headers=user_headers, json={}, timeout=5)
-                print(f"[3] User Client API join result: {user_join_response.status_code} - {user_join_response.text[:200]}")
-                
-                if user_join_response.status_code == 200:
-                    return jsonify({
-                        'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
-                        'success': True,
-                        'method': 'client_api_v3_join'
-                    })
-            
-            # Step 5: If invite was sent, inform user they need to accept
+            # Step 4: If Admin API failed (403, 500, etc.), try other methods
+            # First check if invite was sent successfully
             if invite_response.status_code == 200:
+                # Invite sent - try to force join via user token
+                print(f"[3] Invite sent successfully, trying user token join...")
+                join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                
+                # Get user's access token to join as them
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                    (user_id,)
+                )
+                user_token_row = cur.fetchone()
+                user_token = user_token_row[0] if user_token_row else None
+                cur.close()
+                conn.close()
+                
+                if user_token:
+                    # Join as the user (they will get notification)
+                    user_headers = {
+                        'Authorization': f'Bearer {user_token}',
+                        'Content-Type': 'application/json'
+                    }
+                    print(f"[3] Joining as user via Client API v3...")
+                    user_join_response = requests.post(join_url, headers=user_headers, json={}, timeout=5)
+                    print(f"[3] User Client API join result: {user_join_response.status_code} - {user_join_response.text[:200]}")
+                    
+                    if user_join_response.status_code == 200:
+                        return jsonify({
+                            'message': f'✅ {user_id} odaya eklendi! Element Web\'de bildirim alacak.',
+                            'success': True,
+                            'method': 'client_api_v3_join'
+                        })
+                
+                # Invite sent but couldn't force join - user needs to accept
                 return jsonify({
                     'message': f'📧 {user_id} kullanıcısına davet gönderildi! Element Web\'de kabul etmesi gerekiyor.',
                     'success': True,
                     'method': 'invite_sent'
                 })
             
-            # Step 6: If all methods failed, try database fallback (last resort)
-            # Check if Admin API returned 403 (no permission)
-            if admin_api_response and admin_api_response.status_code == 403:
-                # 403 = Admin doesn't have permission (often DM/private rooms)
-                # Last resort: Database insert (no notification, but works)
-                print(f"[4] Admin API 403, using database fallback...")
+            # Step 5: If Admin API returned 403 or 500, try database fallback
+            if admin_api_response and (admin_api_response.status_code == 403 or admin_api_response.status_code == 500):
+                print(f"[4] Admin API returned {admin_api_response.status_code}, using database fallback...")
                 
                 try:
                     conn = get_db_connection()
@@ -2020,15 +2018,19 @@ def add_room_member(room_id):
                     
                 except Exception as db_err:
                     print(f"Database fallback also failed: {db_err}")
+                    import traceback
+                    traceback.print_exc()
                     return jsonify({
-                        'error': f'Üye eklenemedi. Bu özel bir DM odası olabilir ve admin yetkisi yok.',
+                        'error': f'Üye eklenemedi. Matrix API hatası: {admin_api_response.status_code}',
                         'success': False,
+                        'details': admin_api_response.text[:200] if admin_api_response else 'Unknown error',
                         'suggestion': 'Mevcut oda üyelerinden birinin Element Web üzerinden kullanıcıyı davet etmesi gerekiyor.'
-                    }), 403
+                    }), admin_api_response.status_code if admin_api_response else 500
             else:
-                # All methods failed - return error
+                # Other error status codes - return detailed error
                 error_status = admin_api_response.status_code if admin_api_response else 500
                 error_details = admin_api_response.text[:200] if admin_api_response else 'Unknown error'
+                print(f"[ERROR] Admin API failed with status {error_status}: {error_details}")
                 return jsonify({
                     'error': f'Matrix API hatası: {error_status}',
                     'success': False,
