@@ -2649,8 +2649,10 @@ def change_user_password(user_id):
             conn = get_db_connection()
             cur = conn.cursor()
             
-            # Hash password with bcrypt
-            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            # Hash password with bcrypt (12 rounds - same as Synapse)
+            salt = bcrypt.gensalt(rounds=12)
+            password_hash = bcrypt.hashpw(new_password.encode('utf-8'), salt).decode('utf-8')
+            print(f"[DEBUG] Password hash for {user_id}: {password_hash[:30]}...")
             
             # Update password in database
             cur.execute("""
