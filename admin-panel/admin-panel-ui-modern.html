@@ -1851,7 +1851,7 @@
                                     ${fileSizeStr ? `<span style="color: var(--text-muted); font-size: 11px;">${fileSizeStr}</span>` : ''}
                                 </div>
                                 <div style="max-width: 400px; max-height: 300px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
-                                    <img src="${msg.thumbnail_http_url || msg.media_http_url}" 
+                                    <img src="${msg.media_http_url || msg.thumbnail_http_url}" 
                                          alt="Fotoğraf" 
                                          style="width: 100%; height: auto; display: block; cursor: pointer;"
                                          onclick="window.open('${msg.media_http_url}', '_blank');"
@@ -2846,7 +2846,7 @@
                                     ${fileSizeStr ? `<span style="color: var(--text-muted); font-size: 11px;">${fileSizeStr}</span>` : ''}
                                 </div>
                                 <div style="max-width: 300px; max-height: 200px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
-                                    <img src="${msg.thumbnail_http_url || msg.media_http_url}" 
+                                    <img src="${msg.media_http_url || msg.thumbnail_http_url}" 
                                          alt="Fotoğraf" 
                                          style="width: 100%; height: auto; display: block; cursor: pointer;"
                                          onclick="event.stopPropagation(); window.open('${msg.media_http_url}', '_blank');"

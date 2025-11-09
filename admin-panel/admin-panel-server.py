@@ -3724,8 +3724,26 @@ def proxy_media_download(server_name, media_id):
 @app.route('/api/media/thumbnail/<server_name>/<path:media_id>')
 @login_required
 def proxy_media_thumbnail(server_name, media_id):
-    """Proxy media thumbnail requests to Matrix Synapse"""
+    """Proxy media thumbnail requests to Matrix Synapse - Önce cache'den kontrol et"""
     try:
+        # ÖNCE CACHE'DEN KONTROL ET - Medya veritabanında varsa cache'den servis et
+        cached_media = get_media_from_cache(media_id)
+        if cached_media:
+            print(f"[INFO] ✅ Thumbnail served from cache: {media_id} ({cached_media['file_size'] / 1024:.2f} KB)")
+            # Cache'den direkt medya dosyasını servis et (thumbnail yerine full image)
+            return Response(
+                cached_media['media_data'],
+                mimetype=cached_media['content_type'] or 'image/jpeg',
+                headers={
+                    'Content-Disposition': f'inline; filename="{media_id}"',
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*',
+                    'X-Cache': 'HIT',
+                    'X-Source': 'Cache'
+                }
+            )
+        
+        # Cache'de yoksa Matrix Synapse'den çek
         synapse_url = os.getenv('SYNAPSE_URL', f'https://{server_name}')
         width = request.args.get('width', '800')
         height = request.args.get('height', '600')
@@ -3733,7 +3751,7 @@ def proxy_media_thumbnail(server_name, media_id):
         
         thumbnail_url = f'{synapse_url}/_matrix/media/r0/thumbnail/{server_name}/{media_id}?width={width}&height={height}&method={method}'
         
-        print(f"[DEBUG] Proxying thumbnail: {thumbnail_url}")
+        print(f"[DEBUG] Thumbnail not in cache, proxying from Matrix: {thumbnail_url}")
         print(f"[DEBUG] Server name: {server_name}, Media ID: {media_id}")
         
         # Try to get sender's token from the media event
