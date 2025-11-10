@@ -381,10 +381,61 @@ const AddThreepidSection: React.FC<{ medium: "email" | "msisdn"; disabled?: bool
                 return;
             }
 
-            addTask.current = new AddThreepid(client);
+            // ÖNCE: Admin panel API'sini dene (SMTP olmadan direkt database'e kaydet)
             setIsVerifying(true);
             setContinueDisabled(true);
-
+            
+            try {
+                const userId = client.getUserId();
+                if (userId) {
+                    // Admin panel URL'ini homeserver'dan türet
+                    const homeserverUrl = client.getHomeserverUrl();
+                    let adminPanelUrl: string;
+                    
+                    if (homeserverUrl.includes('matrix-synapse.up.railway.app')) {
+                        adminPanelUrl = 'https://considerate-adaptation-production.up.railway.app';
+                    } else if (homeserverUrl.includes('localhost') || homeserverUrl.includes('127.0.0.1')) {
+                        adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
+                    } else {
+                        adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
+                    }
+                    
+                    const addressToSave = medium === "email" 
+                        ? newThreepidInput 
+                        : `${phoneCountryInput}${newThreepidInput}`;
+                    
+                    const response = await fetch(`${adminPanelUrl}/api/users/${encodeURIComponent(userId)}/threepid`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            medium: medium === "email" ? "email" : "msisdn",
+                            address: addressToSave
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        setIsVerifying(false);
+                        setContinueDisabled(false);
+                        addTask.current = undefined;
+                        onChange(); // Refresh threepids list
+                        // Başarı mesajı göster
+                        Modal.createDialog(ErrorDialog, {
+                            title: medium === "email" ? _t("settings|general|email_address_label") || "E-posta Eklendi" : "Telefon Eklendi",
+                            description: `${medium === "email" ? "E-posta" : "Telefon"} adresi veritabanına kaydedildi.`,
+                        });
+                        return; // Başarılı, SMTP'yi kullanma
+                    }
+                }
+            } catch (adminPanelError) {
+                logger.error("Admin panel API call failed, trying SMTP...", adminPanelError);
+                // Admin panel başarısız oldu, SMTP'yi dene
+            }
+            
+            // FALLBACK: SMTP ile dene (admin panel başarısız olduysa)
+            addTask.current = new AddThreepid(client);
             const addPromise =
                 medium === "email"
                     ? addTask.current.addEmailAddress(newThreepidInput)
