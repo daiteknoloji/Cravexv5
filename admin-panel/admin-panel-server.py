@@ -2920,6 +2920,71 @@ def delete_user(user_id):
         traceback.print_exc()
         return jsonify({'error': str(e), 'success': False}), 500
 
+@app.route('/api/users/<user_id>/threepid', methods=['POST'])
+@login_required
+def add_user_threepid(user_id):
+    """Add email or phone number to user (DATABASE ONLY - no verification)"""
+    try:
+        medium = request.json.get('medium', '').strip().lower()  # 'email' or 'msisdn'
+        address = request.json.get('address', '').strip()  # email address or phone number
+        
+        if not medium or not address:
+            return jsonify({'error': 'Medium (email/msisdn) and address required', 'success': False}), 400
+        
+        if medium not in ['email', 'msisdn']:
+            return jsonify({'error': 'Medium must be "email" or "msisdn"', 'success': False}), 400
+        
+        # Validate email format
+        if medium == 'email' and '@' not in address:
+            return jsonify({'error': 'Invalid email format', 'success': False}), 400
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check if user exists
+        cur.execute("SELECT name FROM users WHERE name = %s", (user_id,))
+        if not cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({'error': f'User {user_id} not found', 'success': False}), 404
+        
+        # Check if threepid already exists
+        cur.execute(
+            "SELECT user_id FROM user_threepids WHERE medium = %s AND address = %s",
+            (medium, address)
+        )
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({'error': f'This {medium} is already registered', 'success': False}), 400
+        
+        # Insert into user_threepids table (no verification - direct database insert)
+        cur.execute(
+            """
+            INSERT INTO user_threepids (user_id, medium, address, validated_at)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (medium, address) DO NOTHING
+            """,
+            (user_id, medium, address, int(datetime.now().timestamp() * 1000))  # validated_at = now (no verification needed)
+        )
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{medium.capitalize()} başarıyla eklendi (doğrulama olmadan)',
+            'medium': medium,
+            'address': address
+        })
+        
+    except Exception as e:
+        print(f"[HATA] POST /api/users/{user_id}/threepid - {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'success': False}), 500
+
 @app.route('/api/users/<user_id>/password', methods=['PUT'])
 @login_required
 def change_user_password(user_id):
