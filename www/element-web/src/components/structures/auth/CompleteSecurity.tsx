@@ -28,6 +28,11 @@ interface IState {
 export default class CompleteSecurity extends React.Component<IProps, IState> {
     public constructor(props: IProps) {
         super(props);
+        // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda store başlatma
+        if (SdkConfig.get("force_disable_encryption") || SdkConfig.get("disable_encryption")) {
+            this.state = { phase: Phase.Finished, lostKeys: false };
+            return;
+        }
         const store = SetupEncryptionStore.sharedInstance();
         store.start();
         this.state = { phase: store.phase, lostKeys: store.lostKeys() };
@@ -61,6 +66,12 @@ export default class CompleteSecurity extends React.Component<IProps, IState> {
     }
 
     public render(): React.ReactNode {
+        // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda hiçbir şey render etme
+        if (SdkConfig.get("force_disable_encryption") || SdkConfig.get("disable_encryption")) {
+            // componentDidMount'da onFinished çağrılıyor ama yine de null döndür
+            return null;
+        }
+        
         const { phase, lostKeys } = this.state;
         let icon;
         let title;

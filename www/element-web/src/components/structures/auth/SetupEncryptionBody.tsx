@@ -20,6 +20,7 @@ import EncryptionPanel from "../../views/right_panel/EncryptionPanel";
 import AccessibleButton, { type ButtonEvent } from "../../views/elements/AccessibleButton";
 import Spinner from "../../views/elements/Spinner";
 import { ResetIdentityDialog } from "../../views/dialogs/ResetIdentityDialog";
+import SdkConfig from "../../../SdkConfig";
 
 function keyHasPassphrase(keyInfo: SecretStorageKeyDescription): boolean {
     return Boolean(keyInfo.passphrase && keyInfo.passphrase.salt && keyInfo.passphrase.iterations);
@@ -39,6 +40,18 @@ interface IState {
 export default class SetupEncryptionBody extends React.Component<IProps, IState> {
     public constructor(props: IProps) {
         super(props);
+        // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda store başlatma
+        if (SdkConfig.get("force_disable_encryption") || SdkConfig.get("disable_encryption")) {
+            this.state = {
+                phase: Phase.Finished,
+                verificationRequest: null,
+                backupInfo: null,
+                lostKeys: false,
+            };
+            // Direkt finished callback'i çağır
+            setTimeout(() => this.props.onFinished(), 0);
+            return;
+        }
         const store = SetupEncryptionStore.sharedInstance();
         store.start();
         this.state = {
@@ -53,6 +66,10 @@ export default class SetupEncryptionBody extends React.Component<IProps, IState>
     }
 
     public componentDidMount(): void {
+        // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda store event listener ekleme
+        if (SdkConfig.get("force_disable_encryption") || SdkConfig.get("disable_encryption")) {
+            return;
+        }
         const store = SetupEncryptionStore.sharedInstance();
         store.on("update", this.onStoreUpdate);
     }
@@ -135,6 +152,11 @@ export default class SetupEncryptionBody extends React.Component<IProps, IState>
     };
 
     public render(): React.ReactNode {
+        // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda hiçbir şey render etme
+        if (SdkConfig.get("force_disable_encryption") || SdkConfig.get("disable_encryption")) {
+            return null;
+        }
+        
         const cli = MatrixClientPeg.safeGet();
         const { phase, lostKeys } = this.state;
 
