@@ -3125,6 +3125,28 @@ def create_user():
         homeserver_domain = os.getenv('HOMESERVER_DOMAIN', 'localhost')
         user_id = f'@{username}:{homeserver_domain}'
         
+        # UNIQUE USERNAME CHECK: Check if username already exists in database
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check if user with same username already exists (check by username part before ':')
+        cur.execute(
+            """
+            SELECT name FROM users 
+            WHERE name LIKE %s
+            """,
+            (f'@{username}:%',)
+        )
+        existing_user = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if existing_user:
+            return jsonify({
+                'error': f'Kullanıcı adı "{username}" zaten kullanılıyor. Lütfen farklı bir kullanıcı adı seçin.',
+                'success': False
+            }), 400
+        
         # Try Matrix Admin API first (if running locally with Synapse)
         try:
             import requests
