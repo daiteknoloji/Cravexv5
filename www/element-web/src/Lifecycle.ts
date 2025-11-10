@@ -880,10 +880,10 @@ async function doSetLoggedIn(
     // Run the migrations after the MatrixClientPeg has been assigned
     SettingsStore.runMigrations(isFreshLogin);
 
-    if (isFreshLogin && !credentials.guest) {
-        // For newly registered users, set a flag so that we force them to verify,
-        // (we don't want to force users with existing sessions to verify though)
-        localStorage.setItem("must_verify_device", "true");
+    // VERIFICATION TAMAMEN KALDIRILDI - must_verify_device flag'i set edilmiyor
+    // Eski flag'leri temizle (eğer varsa)
+    if (localStorage.getItem("must_verify_device")) {
+        localStorage.removeItem("must_verify_device");
     }
 
     return client;

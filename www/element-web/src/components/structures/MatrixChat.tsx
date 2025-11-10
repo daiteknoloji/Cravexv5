@@ -1364,17 +1364,9 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
      * @returns true if the user must verify
      */
     private async shouldForceVerification(): Promise<boolean> {
-        if (!SdkConfig.get("force_verification")) return false;
-        const mustVerifyFlag = localStorage.getItem("must_verify_device");
-        if (!mustVerifyFlag) return false;
-
-        const client = MatrixClientPeg.safeGet();
-        if (client.isGuest()) return false;
-
-        const crypto = client.getCrypto();
-        const crossSigningReady = await crypto?.isCrossSigningReady();
-
-        return !crossSigningReady;
+        // VERIFICATION TAMAMEN KALDIRILDI - Her zaman false döndür
+        // Encryption disable edilmiş ve verification istemiyoruz
+        return false;
     }
 
     /**
@@ -1389,6 +1381,11 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
     }
 
     private async onShowPostLoginScreen(): Promise<void> {
+        // VERIFICATION TAMAMEN KALDIRILDI - Eski flag'leri temizle
+        if (localStorage.getItem("must_verify_device")) {
+            localStorage.removeItem("must_verify_device");
+        }
+        
         this.setStateForNewView({ view: Views.LOGGED_IN });
         // If a specific screen is set to be shown after login, show that above
         // all else, as it probably means the user clicked on something already.
