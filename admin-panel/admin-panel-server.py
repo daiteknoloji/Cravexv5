@@ -2924,6 +2924,14 @@ def delete_user(user_id):
 def add_user_threepid(user_id):
     """Add email or phone number to user (DATABASE ONLY - no verification)
     Can be called from Element Web when SMTP fails - no login required for this endpoint"""
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = jsonify({})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+    
     try:
         medium = request.json.get('medium', '').strip().lower()  # 'email' or 'msisdn'
         address = request.json.get('address', '').strip()  # email address or phone number
