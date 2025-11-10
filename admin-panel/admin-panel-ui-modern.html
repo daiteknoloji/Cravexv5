@@ -2006,6 +2006,7 @@
                 <div class="mb-3">
                     <label class="form-label">Kullanıcı:</label>
                     <div class="form-input" id="changePasswordUserId" style="background: rgba(255,255,255,0.03); cursor: not-allowed;" readonly></div>
+                    <input type="hidden" id="changePasswordUserIdFull" />
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Yeni Şifre:</label>
@@ -2037,6 +2038,19 @@
         let currentRoomId = null;
         let allRooms = [];
         let allUsers = [];
+        
+        // Helper function: Extract username from Matrix ID (@username:domain -> username)
+        function getUsernameFromMatrixId(matrixId) {
+            if (!matrixId) return '';
+            // Remove @ at the beginning if exists
+            let username = matrixId.startsWith('@') ? matrixId.substring(1) : matrixId;
+            // Remove domain part (everything after :)
+            const colonIndex = username.indexOf(':');
+            if (colonIndex !== -1) {
+                username = username.substring(0, colonIndex);
+            }
+            return username;
+        }
         
         // Load stats on page load
         loadStats();
@@ -2276,7 +2290,8 @@
                     
                     data.members.forEach(member => {
                         const initial = member.user_id.substring(1, 2).toUpperCase();
-                        const displayName = member.displayname || member.user_id;
+                        const displayUserId = getUsernameFromMatrixId(member.user_id);
+                        const displayName = member.displayname || displayUserId;
                         
                         html += `
                             <div class="member-item">
@@ -2284,7 +2299,7 @@
                                     <div class="member-avatar">${initial}</div>
                                     <div class="member-details">
                                         <div class="member-name">${displayName}</div>
-                                        <div class="member-id">${member.user_id}</div>
+                                        <div class="member-id">${displayUserId}</div>
                                     </div>
                                 </div>
                             </div>
@@ -2307,7 +2322,8 @@
                     
                     data.members.forEach(member => {
                         const initial = member.user_id.substring(1, 2).toUpperCase();
-                        const displayName = member.displayname || member.user_id;
+                        const displayUserId = getUsernameFromMatrixId(member.user_id);
+                        const displayName = member.displayname || displayUserId;
                         
                         html += `
                             <div class="member-item">
@@ -2315,7 +2331,7 @@
                                     <div class="member-avatar">${initial}</div>
                                     <div class="member-details">
                                         <div class="member-name">${displayName}</div>
-                                        <div class="member-id">${member.user_id}</div>
+                                        <div class="member-id">${displayUserId}</div>
                                     </div>
                                 </div>
                                 ${!isDM ? `
@@ -2623,7 +2639,8 @@
             
             let options = '';
             filteredUsersList.forEach(user => {
-                const displayText = user.displayname ? `${user.displayname} (${user.user_id})` : user.user_id;
+                const displayUserId = getUsernameFromMatrixId(user.user_id);
+                const displayText = user.displayname ? `${user.displayname} (${displayUserId})` : displayUserId;
                 options += `<option value="${user.user_id}">${displayText}</option>`;
             });
             select.innerHTML = options;
@@ -2721,7 +2738,8 @@
         
         // Remove Member
         async function removeMember(userId) {
-            if (!confirm(`${userId} kullanıcısını odadan çıkarmak istediğinize emin misiniz?`)) {
+            const displayUserId = getUsernameFromMatrixId(userId);
+            if (!confirm(`${displayUserId} kullanıcısını odadan çıkarmak istediğinize emin misiniz?`)) {
                 return;
             }
             
@@ -2810,9 +2828,10 @@
                 const adminBadge = user.admin ? '<span class="badge badge-info"><i class="fas fa-crown"></i> Admin</span>' : '<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">Kullanıcı</span>';
                 const lockedBadge = user.locked ? '<span class="badge badge-warning" style="margin-left: 4px;"><i class="fas fa-lock"></i> Kilitli</span>' : '';
                 const bannedBadge = user.shadow_banned ? '<span class="badge badge-danger" style="margin-left: 4px;"><i class="fas fa-ban"></i> Banned</span>' : '';
+                const displayUserId = getUsernameFromMatrixId(user.user_id);
                 html += `
                     <tr>
-                        <td onclick="showUserDetails('${user.user_id}')" style="font-family: monospace; color: var(--accent-blue); font-weight: 500; cursor: pointer;">${user.user_id}</td>
+                        <td onclick="showUserDetails('${user.user_id}')" style="font-family: monospace; color: var(--accent-blue); font-weight: 500; cursor: pointer;">${displayUserId}</td>
                         <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;">${user.displayname || '<em style="color: var(--text-muted);">Yok</em>'}</td>
                         <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;">${adminBadge}${lockedBadge}${bannedBadge}</td>
                         <td onclick="showUserDetails('${user.user_id}')" style="cursor: pointer;"><span class="badge badge-success">${user.room_count} oda</span></td>
@@ -2918,9 +2937,10 @@
             pageUsers.forEach(user => {
                 const adminBadge = user.admin ? '<span class="badge badge-info"><i class="fas fa-crown"></i> Admin</span>' : '<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">Kullanıcı</span>';
                 const deletedBadge = '<span class="badge badge-danger" style="margin-left: 4px;"><i class="fas fa-trash"></i> Silindi</span>';
+                const displayUserId = getUsernameFromMatrixId(user.user_id);
                 html += `
                     <tr>
-                        <td style="font-family: monospace; color: var(--accent-blue); font-weight: 500;">${user.user_id}</td>
+                        <td style="font-family: monospace; color: var(--accent-blue); font-weight: 500;">${displayUserId}</td>
                         <td>${user.displayname || '<em style="color: var(--text-muted);">Yok</em>'}</td>
                         <td>${adminBadge}${deletedBadge}</td>
                         <td><span class="badge badge-success">${user.room_count} oda</span></td>
@@ -2972,7 +2992,8 @@
                     return;
                 }
                 
-                document.getElementById('userModalTitle').textContent = user.user_id;
+                const displayUserId = getUsernameFromMatrixId(user.user_id);
+                document.getElementById('userModalTitle').textContent = displayUserId;
                 
                 const adminToggle = user.admin ? 
                     `<button class="btn btn-danger btn-sm" onclick="toggleAdmin('${userId}', false)"><i class="fas fa-crown-off"></i> Admin Kaldır</button>` :
@@ -2987,7 +3008,7 @@
                         <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 8px;">
                             <div style="margin-bottom: 12px;">
                                 <strong>Kullanıcı ID:</strong><br>
-                                <span style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${user.user_id}</span>
+                                <span style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${displayUserId}</span>
                             </div>
                             <div style="margin-bottom: 12px;">
                                 <strong>Görünen Ad:</strong> ${user.displayname || '<em style="color: var(--text-muted);">Yok</em>'}
@@ -3074,7 +3095,9 @@
         
         // Change Password Modal Functions
         function openChangePasswordModal(userId) {
-            document.getElementById('changePasswordUserId').textContent = userId;
+            const displayUserId = getUsernameFromMatrixId(userId);
+            document.getElementById('changePasswordUserId').textContent = displayUserId;
+            document.getElementById('changePasswordUserIdFull').value = userId; // Store full Matrix ID for API calls
             document.getElementById('newPassword').value = '';
             document.getElementById('confirmPassword').value = '';
             document.getElementById('passwordError').style.display = 'none';
@@ -3086,7 +3109,7 @@
         }
         
         async function submitPasswordChange() {
-            const userId = document.getElementById('changePasswordUserId').textContent;
+            const userId = document.getElementById('changePasswordUserIdFull').value; // Get full Matrix ID
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             const errorDiv = document.getElementById('passwordError');
@@ -3138,7 +3161,8 @@
         }
         
         async function deleteUser(userId) {
-            if (!confirm(`${userId} kullanıcısını sistemden silmek istediğinizden emin misiniz?\n\nKullanıcı deaktif edilecek ve tüm oturumları kapatılacak. Veritabanından silinmeyecek.`)) {
+            const displayUserId = getUsernameFromMatrixId(userId);
+            if (!confirm(`${displayUserId} kullanıcısını sistemden silmek istediğinizden emin misiniz?\n\nKullanıcı deaktif edilecek ve tüm oturumları kapatılacak. Veritabanından silinmeyecek.`)) {
                 return;
             }
             
@@ -3176,9 +3200,10 @@
         }
         
         async function toggleAdmin(userId, makeAdmin) {
+            const displayUserId = getUsernameFromMatrixId(userId);
             const action = makeAdmin ? 'admin yapmak' : 'adminlikten çıkarmak';
             
-            if (!confirm(`${userId} kullanıcısını ${action} istediğinize emin misiniz?`)) {
+            if (!confirm(`${displayUserId} kullanıcısını ${action} istediğinize emin misiniz?`)) {
                 return;
             }
             
