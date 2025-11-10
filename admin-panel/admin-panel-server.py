@@ -2041,28 +2041,96 @@ def add_room_member(room_id):
                 (room_id, ADMIN_USER_ID)
             )
             admin_still_in_room = cur.fetchone()[0] > 0
+            
+            # If admin not in room, try to get room creator to invite admin
+            if not admin_still_in_room:
+                print(f"[WARN] Admin not in room, trying to get room creator to invite admin...")
+                cur.execute(
+                    "SELECT creator FROM rooms WHERE room_id = %s",
+                    (room_id,)
+                )
+                creator_row = cur.fetchone()
+                room_creator = creator_row[0] if creator_row else None
+                
+                if room_creator:
+                    print(f"[INFO] Room creator: {room_creator}")
+                    cur.execute(
+                        "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                        (room_creator,)
+                    )
+                    creator_token_row = cur.fetchone()
+                    creator_token = creator_token_row[0] if creator_token_row else None
+                    
+                    if creator_token:
+                        print(f"[INFO] Found creator token, inviting admin to room...")
+                        creator_headers = {
+                            'Authorization': f'Bearer {creator_token}',
+                            'Content-Type': 'application/json'
+                        }
+                        invite_admin_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
+                        invite_admin_response = requests.post(invite_admin_url, headers=creator_headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                        print(f"[INFO] Creator invite admin result: {invite_admin_response.status_code} - {invite_admin_response.text[:200]}")
+                        
+                        if invite_admin_response.status_code == 200:
+                            print(f"[INFO] ✅ Admin invited by creator! Now joining...")
+                            # Admin was invited, now join
+                            client_join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                            admin_client_response = requests.post(client_join_url, headers=headers, json={}, timeout=10)
+                            print(f"[INFO] Admin Client API join result: {admin_client_response.status_code} - {admin_client_response.text[:200]}")
+                            
+                            if admin_client_response.status_code == 200:
+                                print(f"[INFO] ✅ Admin successfully joined room!")
+                                admin_still_in_room = True
+                            else:
+                                # Try Admin API as fallback
+                                print(f"[WARN] Client API failed, trying Admin API...")
+                                admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
+                                admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                                print(f"[INFO] Admin API join result: {admin_response.status_code} - {admin_response.text[:200]}")
+                                if admin_response.status_code == 200:
+                                    admin_still_in_room = True
+                        else:
+                            print(f"[WARN] Creator invite failed: {invite_admin_response.text}")
+                    else:
+                        print(f"[WARN] Creator token not found")
+                else:
+                    print(f"[WARN] Room creator not found")
+                
+                # Fallback: Try direct join
+                if not admin_still_in_room:
+                    print(f"[WARN] Admin still not in room, trying direct join...")
+                    try:
+                        client_join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                        admin_client_response = requests.post(client_join_url, headers=headers, json={}, timeout=10)
+                        print(f"[INFO] Admin Client API join (retry) result: {admin_client_response.status_code}")
+                        if admin_client_response.status_code == 200:
+                            print(f"[INFO] ✅ Admin successfully joined room (retry)!")
+                            admin_still_in_room = True
+                    except Exception as retry_err:
+                        print(f"[ERROR] Admin join retry failed: {retry_err}")
+            
             cur.close()
             conn.close()
             
+            # Only send invite if admin is in room
+            invite_response = None
             if not admin_still_in_room:
-                print(f"[WARN] Admin not in room, trying to add admin again before invite...")
-                try:
-                    client_join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
-                    admin_client_response = requests.post(client_join_url, headers=headers, json={}, timeout=10)
-                    print(f"[INFO] Admin Client API join (retry) result: {admin_client_response.status_code}")
-                    if admin_client_response.status_code == 200:
-                        print(f"[INFO] ✅ Admin successfully joined room (retry)!")
-                except Exception as retry_err:
-                    print(f"[ERROR] Admin join retry failed: {retry_err}")
-            
-            invite_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
-            print(f"[INFO] Invite URL: {invite_url}")
-            invite_response = requests.post(invite_url, headers=headers, json={'user_id': user_id}, timeout=10)
-            print(f"[INFO] Invite status: {invite_response.status_code}")
-            print(f"[INFO] Invite response: {invite_response.text[:500]}")
+                print(f"[ERROR] ❌ Admin still not in room after all attempts. Cannot send invite!")
+                print(f"[ERROR] Falling back to database-only add (NO NOTIFICATION)")
+                # Create a fake failed response
+                class FakeResponse:
+                    status_code = 403
+                    text = '{"errcode":"M_FORBIDDEN","error":"Admin not in room"}'
+                invite_response = FakeResponse()
+            else:
+                invite_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
+                print(f"[INFO] Invite URL: {invite_url}")
+                invite_response = requests.post(invite_url, headers=headers, json={'user_id': user_id}, timeout=10)
+                print(f"[INFO] Invite status: {invite_response.status_code}")
+                print(f"[INFO] Invite response: {invite_response.text[:500]}")
             
             # If invite sent successfully, try to auto-join user with their token
-            if invite_response.status_code == 200:
+            if invite_response and invite_response.status_code == 200:
                 print(f"[INFO] Invite sent successfully, trying to auto-join user with their token...")
                 join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
                 
