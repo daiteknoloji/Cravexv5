@@ -96,11 +96,21 @@ password_config:
   localdb_enabled: true
   pepper: "CHANGE_THIS_PEPPER"
   
-## Password reset (disabled - no email configured) ##
-enable_password_reset: false
+## Password reset (enabled with SMTP) ##
+enable_password_reset: true
 
-## Email (disabled for Railway) ##
-# Email notifications disabled - no SMTP server configured
+## Email Configuration (SMTP) ##
+# Gmail SMTP konfigürasyonu - cravexmail@gmail.com
+# Railway'de SYNAPSE_EMAIL_SMTP_PASS environment variable kullanılır
+email:
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+  smtp_user: "cravexmail@gmail.com"
+  smtp_pass: "${SYNAPSE_EMAIL_SMTP_PASS}"  # Environment variable (Railway Variables'dan gelecek)
+  require_transport_security: true
+  notif_from: "CraveX <cravexmail@gmail.com>"
+  app_name: "CraveX"
+  enable_notifs: false
 
 ## Ratelimiting ##
 rc_message:
