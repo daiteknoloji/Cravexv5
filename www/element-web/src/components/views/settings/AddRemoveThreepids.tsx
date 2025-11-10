@@ -366,7 +366,7 @@ const AddThreepidSection: React.FC<{ medium: "email" | "msisdn"; disabled?: bool
     }, []);
 
     const onAddClick = useCallback(
-        (e: React.FormEvent) => {
+        async (e: React.FormEvent) => {
             e.stopPropagation();
             e.preventDefault();
 
