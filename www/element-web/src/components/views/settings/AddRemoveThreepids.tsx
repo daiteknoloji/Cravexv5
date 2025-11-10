@@ -9,8 +9,6 @@ Please see LICENSE files in the repository root for full details.
 import React, { useCallback, useRef, useState } from "react";
 import { logger } from "matrix-js-sdk/src/logger";
 import {
-    type IRequestMsisdnTokenResponse,
-    type IRequestTokenResponse,
     MatrixError,
     ThreepidMedium,
 } from "matrix-js-sdk/src/matrix";
@@ -278,88 +276,20 @@ const ExistingThreepid: React.FC<ExistingThreepidProps> = ({ mode, threepid, onC
     );
 };
 
-function isMsisdnResponse(
-    resp: IRequestTokenResponse | IRequestMsisdnTokenResponse,
-): resp is IRequestMsisdnTokenResponse {
-    return (resp as IRequestMsisdnTokenResponse).msisdn !== undefined;
-}
-
 const AddThreepidSection: React.FC<{ medium: "email" | "msisdn"; disabled?: boolean; onChange: () => void }> = ({
     medium,
     disabled,
     onChange,
 }) => {
-    const addTask = useRef<AddThreepid>(undefined);
     const [newThreepidInput, setNewThreepidInput] = useState("");
     const [phoneCountryInput, setPhoneCountryInput] = useState("");
-    const [verificationCodeInput, setVerificationCodeInput] = useState("");
-    const [isVerifying, setIsVerifying] = useState(false);
     const [continueDisabled, setContinueDisabled] = useState(false);
-    const [sentToMsisdn, setSentToMsisdn] = useState("");
 
     const client = useMatrixClientContext();
 
     const onPhoneCountryChanged = useCallback((country: PhoneNumberCountryDefinition) => {
         setPhoneCountryInput(country.iso2);
     }, []);
-
-    const onContinueClick = useCallback(
-        (e: ButtonEvent) => {
-            e.stopPropagation();
-            e.preventDefault();
-
-            if (!addTask.current) return;
-
-            setContinueDisabled(true);
-
-            const checkPromise =
-                medium === "email"
-                    ? addTask.current?.checkEmailLinkClicked()
-                    : addTask.current?.haveMsisdnToken(verificationCodeInput);
-            checkPromise
-                .then(([finished]) => {
-                    if (finished) {
-                        addTask.current = undefined;
-                        setIsVerifying(false);
-                        setNewThreepidInput("");
-                        onChange();
-                    }
-                    setContinueDisabled(false);
-                })
-                .catch((err) => {
-                    logger.error("Unable to verify 3pid: ", err);
-
-                    setContinueDisabled(false);
-
-                    let underlyingError = err;
-                    if (err instanceof UserFriendlyError) {
-                        underlyingError = err.cause;
-                    }
-
-                    if (
-                        underlyingError instanceof MatrixError &&
-                        underlyingError.errcode === "M_THREEPID_AUTH_FAILED"
-                    ) {
-                        Modal.createDialog(ErrorDialog, {
-                            title:
-                                medium === "email"
-                                    ? _t("settings|general|email_not_verified")
-                                    : _t("settings|general|error_msisdn_verification"),
-                            description: _t("settings|general|email_verification_instructions"),
-                        });
-                    } else {
-                        Modal.createDialog(ErrorDialog, {
-                            title:
-                                medium == "email"
-                                    ? _t("settings|general|error_email_verification")
-                                    : _t("settings|general|error_msisdn_verification"),
-                            description: extractErrorMessageFromError(err, _t("invite|failed_generic")),
-                        });
-                    }
-                });
-        },
-        [onChange, medium, verificationCodeInput],
-    );
 
     const onNewThreepidInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setNewThreepidInput(e.target.value);
@@ -381,191 +311,80 @@ const AddThreepidSection: React.FC<{ medium: "email" | "msisdn"; disabled?: bool
                 return;
             }
 
-            // ÖNCE: Admin panel API'sini dene (SMTP olmadan direkt database'e kaydet)
-            setIsVerifying(true);
+            // SADECE: Admin panel API'sini kullan (SMTP YOK - direkt database'e kaydet)
             setContinueDisabled(true);
             
             try {
                 const userId = client.getUserId();
-                if (userId) {
-                    // Admin panel URL'ini homeserver'dan türet
-                    const homeserverUrl = client.getHomeserverUrl();
-                    let adminPanelUrl: string;
-                    
-                    if (homeserverUrl.includes('matrix-synapse.up.railway.app')) {
-                        adminPanelUrl = 'https://considerate-adaptation-production.up.railway.app';
-                    } else if (homeserverUrl.includes('localhost') || homeserverUrl.includes('127.0.0.1')) {
-                        adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
-                    } else {
-                        adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
-                    }
-                    
-                    const addressToSave = medium === "email" 
-                        ? newThreepidInput 
-                        : `${phoneCountryInput}${newThreepidInput}`;
-                    
-                    const response = await fetch(`${adminPanelUrl}/api/users/${encodeURIComponent(userId)}/threepid`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            medium: medium === "email" ? "email" : "msisdn",
-                            address: addressToSave
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        setIsVerifying(false);
-                        setContinueDisabled(false);
-                        addTask.current = undefined;
-                        onChange(); // Refresh threepids list
-                        // Başarı mesajı göster
-                        Modal.createDialog(ErrorDialog, {
-                            title: medium === "email" ? _t("settings|general|email_address_label") || "E-posta Eklendi" : "Telefon Eklendi",
-                            description: `${medium === "email" ? "E-posta" : "Telefon"} adresi veritabanına kaydedildi.`,
-                        });
-                        return; // Başarılı, SMTP'yi kullanma
-                    }
+                if (!userId) {
+                    throw new Error("Kullanıcı ID bulunamadı");
                 }
-            } catch (adminPanelError) {
-                logger.error("Admin panel API call failed, trying SMTP...", adminPanelError);
-                // Admin panel başarısız oldu, SMTP'yi dene
-            }
-            
-            // FALLBACK: SMTP ile dene (admin panel başarısız olduysa)
-            addTask.current = new AddThreepid(client);
-            const addPromise =
-                medium === "email"
-                    ? addTask.current.addEmailAddress(newThreepidInput)
-                    : addTask.current.addMsisdn(phoneCountryInput, newThreepidInput);
-
-            addPromise
-                .then((resp: IRequestTokenResponse | IRequestMsisdnTokenResponse) => {
-                    setContinueDisabled(false);
-                    if (isMsisdnResponse(resp)) {
-                        setSentToMsisdn(resp.msisdn);
-                    }
-                })
-                .catch(async (err) => {
-                    logger.error(`Unable to add threepid ${newThreepidInput}`, err);
-                    
-                    // SMTP hatası varsa, admin panel API'sini kullanarak database'e kaydetmeyi dene
-                    const isSmtpError = err instanceof MatrixError && (
-                        err.errcode === "M_THREEPID_MEDIUM_NOT_SUPPORTED" ||
-                        err.httpStatus === 500 ||
-                        (err.message && err.message.includes("sending the email"))
-                    );
-                    
-                    if (isSmtpError) {
-                        try {
-                            // Admin panel API'sini çağır (doğrulama olmadan database'e kaydet)
-                            const userId = client.getUserId();
-                            if (userId) {
-                                // Admin panel URL'ini homeserver'dan türet
-                                // Railway: matrix-synapse.up.railway.app -> considerate-adaptation-production.up.railway.app
-                                // Lokal: localhost:8008 -> localhost:9000
-                                const homeserverUrl = client.getHomeserverUrl();
-                                let adminPanelUrl: string;
-                                
-                                if (homeserverUrl.includes('matrix-synapse.up.railway.app')) {
-                                    adminPanelUrl = 'https://considerate-adaptation-production.up.railway.app';
-                                } else if (homeserverUrl.includes('localhost') || homeserverUrl.includes('127.0.0.1')) {
-                                    adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
-                                } else {
-                                    // Fallback: homeserver URL'inden türet
-                                    adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
-                                }
-                                
-                                const addressToSave = medium === "email" 
-                                    ? newThreepidInput 
-                                    : `${phoneCountryInput}${newThreepidInput}`;
-                                
-                                const response = await fetch(`${adminPanelUrl}/api/users/${encodeURIComponent(userId)}/threepid`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                    },
-                                    credentials: 'include', // Cookie ile admin panel'e giriş yapılmışsa
-                                    body: JSON.stringify({
-                                        medium: medium === "email" ? "email" : "msisdn",
-                                        address: addressToSave
-                                    })
-                                });
-                                
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    setIsVerifying(false);
-                                    setContinueDisabled(false);
-                                    addTask.current = undefined;
-                                    onChange(); // Refresh threepids list
-                                    Modal.createDialog(ErrorDialog, {
-                                        title: _t("settings|general|email_address_label") || "E-posta/Telefon Eklendi",
-                                        description: `${medium === "email" ? "E-posta" : "Telefon"} adresi veritabanına kaydedildi (doğrulama e-postası gönderilemedi - SMTP yapılandırılmamış).`,
-                                    });
-                                    return; // Başarılı, hata gösterme
-                                }
-                            }
-                        } catch (adminPanelError) {
-                            logger.error("Admin panel API call failed", adminPanelError);
-                            // Admin panel çağrısı başarısız oldu, normal hata mesajını göster
-                        }
-                    }
-                    
-                    // Normal hata mesajını göster
-                    setIsVerifying(false);
-                    setContinueDisabled(false);
-                    addTask.current = undefined;
-                    Modal.createDialog(ErrorDialog, {
-                        title: medium === "email" ? _t("settings|general|error_add_email") : _t("common|error"),
-                        description: extractErrorMessageFromError(err, _t("invite|failed_generic")),
-                    });
+                
+                // Admin panel URL'ini homeserver'dan türet
+                const homeserverUrl = client.getHomeserverUrl();
+                let adminPanelUrl: string;
+                
+                if (homeserverUrl.includes('matrix-synapse.up.railway.app')) {
+                    adminPanelUrl = 'https://considerate-adaptation-production.up.railway.app';
+                } else if (homeserverUrl.includes('localhost') || homeserverUrl.includes('127.0.0.1')) {
+                    adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
+                } else {
+                    adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
+                }
+                
+                const addressToSave = medium === "email" 
+                    ? newThreepidInput 
+                    : `${phoneCountryInput}${newThreepidInput}`;
+                
+                logger.log(`[AddThreepid] Admin panel API çağrısı: ${adminPanelUrl}/api/users/${encodeURIComponent(userId)}/threepid`);
+                
+                const response = await fetch(`${adminPanelUrl}/api/users/${encodeURIComponent(userId)}/threepid`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        medium: medium === "email" ? "email" : "msisdn",
+                        address: addressToSave
+                    })
                 });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Başarılı - direkt database'e kaydedildi
+                    setContinueDisabled(false);
+                    setNewThreepidInput(""); // Input'u temizle
+                    onChange(); // Refresh threepids list
+                    
+                    // Başarı mesajı göster
+                    Modal.createDialog(ErrorDialog, {
+                        title: medium === "email" ? "E-posta Eklendi" : "Telefon Eklendi",
+                        description: `${medium === "email" ? "E-posta" : "Telefon"} adresi başarıyla kaydedildi.`,
+                    });
+                    return;
+                } else {
+                    // API hatası
+                    throw new Error(result.error || `API hatası: ${response.status}`);
+                }
+            } catch (error) {
+                logger.error(`[AddThreepid] Admin panel API hatası:`, error);
+                setContinueDisabled(false);
+                
+                // Hata mesajını göster
+                Modal.createDialog(ErrorDialog, {
+                    title: medium === "email" ? "E-posta Eklenemedi" : "Telefon Eklenemedi",
+                    description: error instanceof Error 
+                        ? error.message 
+                        : `${medium === "email" ? "E-posta" : "Telefon"} adresi kaydedilemedi. Lütfen tekrar deneyin.`,
+                });
+            }
         },
-        [client, phoneCountryInput, newThreepidInput, medium],
+        [client, phoneCountryInput, newThreepidInput, medium, onChange],
     );
 
-    const onVerificationCodeInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        setVerificationCodeInput(e.target.value);
-    }, []);
-
-    if (isVerifying && medium === "email") {
-        return (
-            <div>
-                <div>{_t("settings|general|add_email_instructions")}</div>
-                <AccessibleButton onClick={onContinueClick} kind="primary" disabled={continueDisabled}>
-                    {_t("action|continue")}
-                </AccessibleButton>
-            </div>
-        );
-    } else if (isVerifying) {
-        return (
-            <div>
-                <div>
-                    {_t("settings|general|add_msisdn_instructions", { msisdn: sentToMsisdn })}
-                    <br />
-                </div>
-                <form onSubmit={onContinueClick} autoComplete="off" noValidate={true}>
-                    <Field
-                        type="text"
-                        label={_t("settings|general|msisdn_verification_field_label")}
-                        autoComplete="off"
-                        disabled={disabled || continueDisabled}
-                        value={verificationCodeInput}
-                        onChange={onVerificationCodeInputChange}
-                    />
-                    <AccessibleButton
-                        onClick={onContinueClick}
-                        kind="primary"
-                        disabled={disabled || continueDisabled || verificationCodeInput.length === 0}
-                    >
-                        {_t("action|continue")}
-                    </AccessibleButton>
-                </form>
-            </div>
-        );
-    }
+    // SMTP doğrulama modalı kaldırıldı - artık direkt database'e kaydediyoruz
+    // Loading state için continueDisabled kullanılıyor
 
     const phoneCountry =
         medium === "msisdn" ? (
@@ -573,7 +392,7 @@ const AddThreepidSection: React.FC<{ medium: "email" | "msisdn"; disabled?: bool
                 onOptionChange={onPhoneCountryChanged}
                 className="mx_PhoneNumbers_country"
                 value={phoneCountryInput}
-                disabled={isVerifying}
+                disabled={continueDisabled}
                 isSmall={true}
                 showPrefix={true}
             />
@@ -589,13 +408,13 @@ const AddThreepidSection: React.FC<{ medium: "email" | "msisdn"; disabled?: bool
                         : _t("settings|general|msisdn_label")
                 }
                 autoComplete={medium === "email" ? "email" : "tel-national"}
-                disabled={disabled || isVerifying}
+                disabled={disabled || continueDisabled}
                 value={newThreepidInput}
                 onChange={onNewThreepidInputChange}
                 prefixComponent={phoneCountry}
             />
-            <AccessibleButton onClick={onAddClick} kind="primary" disabled={disabled}>
-                {_t("action|add")}
+            <AccessibleButton onClick={onAddClick} kind="primary" disabled={disabled || continueDisabled}>
+                {continueDisabled ? "Ekleniyor..." : _t("action|add")}
             </AccessibleButton>
         </form>
     );
