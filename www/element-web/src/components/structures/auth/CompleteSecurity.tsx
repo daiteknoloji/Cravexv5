@@ -34,6 +34,12 @@ export default class CompleteSecurity extends React.Component<IProps, IState> {
     }
 
     public componentDidMount(): void {
+        // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda direkt skip et
+        if (SdkConfig.get("force_disable_encryption") || SdkConfig.get("disable_encryption")) {
+            this.props.onFinished();
+            return;
+        }
+        
         const store = SetupEncryptionStore.sharedInstance();
         store.on("update", this.onStoreUpdate);
     }

@@ -421,13 +421,19 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
             // if the user has previously set up cross-signing, verify this device so we can fetch the
             // private keys.
 
+            // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda direkt login'e geç
             const cryptoExtension = ModuleRunner.instance.extensions.cryptoSetup;
-            if (cryptoExtension.SHOW_ENCRYPTION_SETUP_UI == false) {
+            if (cryptoExtension.SHOW_ENCRYPTION_SETUP_UI == false || 
+                SdkConfig.get("force_disable_encryption") || 
+                SdkConfig.get("disable_encryption")) {
                 this.onLoggedIn();
             } else {
                 this.setStateForNewView({ view: Views.COMPLETE_SECURITY });
             }
         } else if (
+            // VERIFICATION TAMAMEN KALDIRILDI - Encryption disable durumunda E2E setup'ı atla
+            !SdkConfig.get("force_disable_encryption") &&
+            !SdkConfig.get("disable_encryption") &&
             (await cli.doesServerSupportUnstableFeature("org.matrix.e2e_cross_signing")) &&
             !(await shouldSkipSetupEncryption(cli))
         ) {
