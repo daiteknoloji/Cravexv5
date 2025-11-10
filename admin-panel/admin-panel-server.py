@@ -2920,7 +2920,7 @@ def delete_user(user_id):
         traceback.print_exc()
         return jsonify({'error': str(e), 'success': False}), 500
 
-@app.route('/api/users/<user_id>/threepid', methods=['POST'])
+@app.route('/api/users/<user_id>/threepid', methods=['POST', 'OPTIONS'])
 def add_user_threepid(user_id):
     """Add email or phone number to user (DATABASE ONLY - no verification)
     Can be called from Element Web when SMTP fails - no login required for this endpoint"""
@@ -2972,12 +2972,17 @@ def add_user_threepid(user_id):
         cur.close()
         conn.close()
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'message': f'{medium.capitalize()} başarıyla eklendi (doğrulama olmadan)',
             'medium': medium,
             'address': address
         })
+        # CORS headers for Element Web
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
         
     except Exception as e:
         print(f"[HATA] POST /api/users/{user_id}/threepid - {str(e)}")
