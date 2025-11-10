@@ -2069,7 +2069,15 @@ def add_room_member(room_id):
                 ('already' in invite_error_text or 'joined' in invite_error_text or 'member' in invite_error_text)
             ) or exists > 0
             
+            print(f"[DEBUG] ===== INVITE FAILED ANALYSIS =====")
+            print(f"[DEBUG] Invite status code: {invite_response.status_code}")
+            print(f"[DEBUG] Invite error text: {invite_error_text}")
+            print(f"[DEBUG] User exists in DB: {exists > 0}")
+            print(f"[DEBUG] Is already in room: {is_already_in_room}")
+            print(f"[DEBUG] Admin still in room: {admin_still_in_room}")
+            
             if is_already_in_room:
+                print(f"[INFO] User already in room, returning success")
                 return jsonify({
                     'success': True,
                     'message': f'✅ {user_id} zaten odada!',
@@ -2077,6 +2085,12 @@ def add_room_member(room_id):
                 })
             
             # Invite failed but user not in room - add to database anyway
+            print(f"[WARN] ⚠️ Invite failed and user not in room - falling back to database only")
+            print(f"[WARN] This means NO NOTIFICATION will be sent!")
+            print(f"[WARN] Admin API status: {admin_api_response.status_code}")
+            print(f"[WARN] Invite status: {invite_response.status_code}")
+            print(f"[WARN] Admin in room: {admin_still_in_room}")
+            
             conn = get_db_connection()
             cur = conn.cursor()
             import time
@@ -2090,10 +2104,19 @@ def add_room_member(room_id):
             cur.close()
             conn.close()
             
+            print(f"[ERROR] ❌ FALLBACK TO DATABASE - User added but NO notification sent!")
+            print(f"[ERROR] User will need to refresh Element Web manually")
+            
             return jsonify({
                 'success': True,
                 'message': f'✅ {user_id} odaya eklendi. Element Web\'de refresh yapması gerekebilir.',
-                'method': 'database'
+                'method': 'database',
+                'debug_info': {
+                    'admin_api_status': admin_api_response.status_code,
+                    'invite_status': invite_response.status_code,
+                    'admin_in_room': admin_still_in_room,
+                    'user_exists': exists > 0
+                }
             })
                 
         except Exception as api_error:
