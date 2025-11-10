@@ -41,6 +41,16 @@ ADMIN_USER_ID = f'@admin:{HOMESERVER_DOMAIN}'
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
+# Global CORS support - tüm response'lara CORS headers ekle
+@app.after_request
+def after_request(response):
+    """Tüm response'lara CORS headers ekle"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
+
 # Media Cache Functions
 def init_media_cache_table():
     """Media cache tablosunu oluştur"""
@@ -2924,13 +2934,9 @@ def delete_user(user_id):
 def add_user_threepid(user_id):
     """Add email or phone number to user (DATABASE ONLY - no verification)
     Can be called from Element Web when SMTP fails - no login required for this endpoint"""
-    # Handle CORS preflight
+    # Handle CORS preflight (global CORS handler zaten var ama OPTIONS için özel response)
     if request.method == 'OPTIONS':
-        response = jsonify({})
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response
+        return jsonify({}), 200
     
     try:
         medium = request.json.get('medium', '').strip().lower()  # 'email' or 'msisdn'
@@ -2980,17 +2986,13 @@ def add_user_threepid(user_id):
         cur.close()
         conn.close()
         
-        response = jsonify({
+        # Başarılı response (CORS headers global handler tarafından ekleniyor)
+        return jsonify({
             'success': True,
             'message': f'{medium.capitalize()} başarıyla eklendi (doğrulama olmadan)',
             'medium': medium,
             'address': address
         })
-        # CORS headers for Element Web
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response
         
     except Exception as e:
         print(f"[HATA] POST /api/users/{user_id}/threepid - {str(e)}")
