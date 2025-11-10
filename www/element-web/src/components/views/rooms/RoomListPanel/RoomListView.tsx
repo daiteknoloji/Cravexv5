@@ -20,9 +20,13 @@ export function RoomListView(): JSX.Element {
     const isRoomListEmpty = vm.roomsResult.rooms.length === 0;
     let listBody;
     if (vm.isLoadingRooms) {
-        listBody = <div className="mx_RoomListSkeleton" />;
+        // DISABLED: Hide skeleton placeholder for new users with no messages
+        // listBody = <div className="mx_RoomListSkeleton" />;
+        listBody = null;
     } else if (isRoomListEmpty) {
-        listBody = <EmptyRoomList vm={vm} />;
+        // DISABLED: Hide empty state placeholder for new users with no messages
+        // listBody = <EmptyRoomList vm={vm} />;
+        listBody = null;
     } else {
         listBody = <RoomList vm={vm} />;
     }

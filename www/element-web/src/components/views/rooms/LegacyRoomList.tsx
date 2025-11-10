@@ -592,9 +592,12 @@ export default class LegacyRoomList extends React.PureComponent<IProps, IState> 
 
     private renderSublists(): React.ReactElement[] {
         // show a skeleton UI if the user is in no rooms and they are not filtering and have no suggested rooms
-        const showSkeleton =
-            !this.state.suggestedRooms?.length &&
-            Object.values(RoomListStore.instance.orderedLists).every((list) => !list?.length);
+        // DISABLED: Hide skeleton placeholder for new users with no messages
+        const showSkeleton = false;
+        // Original code (disabled):
+        // const showSkeleton =
+        //     !this.state.suggestedRooms?.length &&
+        //     Object.values(RoomListStore.instance.orderedLists).every((list) => !list?.length);
 
         return TAG_ORDER.map((orderedTagId) => {
             let extraTiles: ReactComponentElement<typeof ExtraTile>[] | undefined;

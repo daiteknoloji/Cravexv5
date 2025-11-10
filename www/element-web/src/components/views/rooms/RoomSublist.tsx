@@ -837,7 +837,9 @@ export default class RoomSublist extends React.Component<IProps, IState> {
                 </React.Fragment>
             );
         } else if (this.props.showSkeleton && this.state.isExpanded) {
-            content = <div className="mx_RoomSublist_skeletonUI" />;
+            // DISABLED: Hide skeleton placeholder for new users with no messages
+            // content = <div className="mx_RoomSublist_skeletonUI" />;
+            content = undefined;
         }
 
         return (
