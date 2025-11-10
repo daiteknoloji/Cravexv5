@@ -1841,6 +1841,21 @@ def add_room_member(room_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # Check if this is a DM room (2 members = Direct Message, cannot add members)
+        cur.execute(
+            "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND membership = 'join'",
+            (room_id,)
+        )
+        member_count = cur.fetchone()[0]
+        
+        if member_count == 2:
+            cur.close()
+            conn.close()
+            return jsonify({
+                'error': 'Bu bir direkt mesaj (DM) odası. DM\'lere üye eklenemez.',
+                'success': False
+            }), 400
+        
         # Check if already member (but don't exit early - try to send invite anyway for notification)
         cur.execute(
             "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id = %s AND membership = 'join'",
