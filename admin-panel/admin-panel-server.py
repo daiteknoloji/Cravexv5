@@ -2973,13 +2973,15 @@ def add_user_threepid(user_id):
             return jsonify({'error': f'This {medium} is already registered', 'success': False}), 400
         
         # Insert into user_threepids table (no verification - direct database insert)
+        # added_at ve validated_at her ikisi de şu anki zamanı kullanıyor (doğrulama olmadan)
+        current_timestamp = int(datetime.now().timestamp() * 1000)
         cur.execute(
             """
-            INSERT INTO user_threepids (user_id, medium, address, validated_at)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO user_threepids (user_id, medium, address, validated_at, added_at)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (medium, address) DO NOTHING
             """,
-            (user_id, medium, address, int(datetime.now().timestamp() * 1000))  # validated_at = now (no verification needed)
+            (user_id, medium, address, current_timestamp, current_timestamp)
         )
         
         conn.commit()
