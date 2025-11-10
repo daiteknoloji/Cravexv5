@@ -83,9 +83,25 @@ trusted_key_servers:
 #   host: redis
 #   port: 6379
 
-# Email notifications (disabled)
-# email:
-#   enable_notifs: false
+# Email configuration (SMTP)
+# Gmail SMTP konfigürasyonu - cravexmail@gmail.com
+# Railway'de SYNAPSE_EMAIL_SMTP_PASS environment variable kullanılır
+email:
+  # SMTP sunucu bilgileri
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+  smtp_user: "cravexmail@gmail.com"  # Gmail adresiniz
+  smtp_pass: "${SYNAPSE_EMAIL_SMTP_PASS:-fibr mwaw wlcu tzpe}"  # Environment variable (Railway) veya fallback (lokal)
+  require_transport_security: true  # TLS/SSL kullan
+  
+  # Gönderen bilgileri
+  notif_from: "CraveX <cravexmail@gmail.com>"  # E-postalarda görünecek gönderen adı
+  
+  # Uygulama adı
+  app_name: "CraveX"
+  
+  # E-posta bildirimleri (isteğe bağlı)
+  enable_notifs: false  # Oda bildirimleri için e-posta göndermek isterseniz true yapın
 
 # Turn server (disabled)
 turn_uris: []
