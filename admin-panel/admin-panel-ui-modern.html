@@ -2239,8 +2239,8 @@
                 
                 document.getElementById('roomModalTitle').textContent = room.name;
                 
-                // Check if this is a DM room (2 members and no name set, or name starts with "DM:")
-                const isDM = room.is_dm || room.name.startsWith('DM:');
+                // Check if this is a DM room (2 members = Direct Message, cannot add members)
+                const isDM = room.member_count === 2;
                 
                 let html = `
                     <div class="mb-3">
