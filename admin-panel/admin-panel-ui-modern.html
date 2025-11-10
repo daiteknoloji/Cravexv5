@@ -2239,8 +2239,8 @@
                 
                 document.getElementById('roomModalTitle').textContent = room.name;
                 
-                // Check if this is a DM room (2 members = Direct Message, cannot add members)
-                const isDM = room.member_count === 2;
+                // Check if this is a DM room (use is_dm flag from backend, or fallback to member_count === 2)
+                const isDM = room.is_dm || (room.member_count === 2 && !room.name);
                 
                 let html = `
                     <div class="mb-3">
@@ -2666,7 +2666,7 @@
             
             // Check if this is a DM room BEFORE making API call
             const room = allRooms.find(r => r.room_id === currentRoomId);
-            if (room && room.member_count === 2) {
+            if (room && (room.is_dm || (room.member_count === 2 && !room.name))) {
                 showToast('Bu bir direkt mesaj (DM) odası. DM\'lere üye eklenemez!', 'error');
                 closeAddMemberModal();
                 return;

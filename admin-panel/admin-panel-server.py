@@ -1841,14 +1841,50 @@ def add_room_member(room_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Check if this is a DM room (2 members = Direct Message, cannot add members)
+        # Check if this is a DM room using is_direct flag from m.room.create event
+        cur.execute(
+            """
+            SELECT ej.json::json->'content'->>'is_direct'
+            FROM event_json ej
+            WHERE ej.room_id = %s 
+              AND ej.json::json->>'type' = 'm.room.create'
+            ORDER BY (ej.json::json->>'origin_server_ts')::bigint ASC
+            LIMIT 1
+            """,
+            (room_id,)
+        )
+        is_direct_row = cur.fetchone()
+        is_direct = is_direct_row[0] if is_direct_row and is_direct_row[0] else None
+        
+        # Also check member count as fallback (DM rooms typically have 2 members)
         cur.execute(
             "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND membership = 'join'",
             (room_id,)
         )
         member_count = cur.fetchone()[0]
         
-        if member_count == 2:
+        # Only treat as DM if is_direct is explicitly true, OR if member_count is 2 AND no room name (typical DM pattern)
+        is_dm = False
+        if is_direct and is_direct.lower() == 'true':
+            is_dm = True
+        elif member_count == 2:
+            # Check if room has a name - DMs usually don't have names, group rooms do
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM event_json ej
+                WHERE ej.room_id = %s 
+                  AND ej.json::json->>'type' = 'm.room.name'
+                  AND ej.json::json->'content'->>'name' IS NOT NULL
+                  AND ej.json::json->'content'->>'name' != ''
+                """,
+                (room_id,)
+            )
+            has_name = cur.fetchone()[0] > 0
+            # If no name and 2 members, likely a DM
+            if not has_name:
+                is_dm = True
+        
+        if is_dm:
             cur.close()
             conn.close()
             return jsonify({
