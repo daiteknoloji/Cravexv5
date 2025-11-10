@@ -2659,6 +2659,19 @@
                 return;
             }
             
+            if (!currentRoomId) {
+                showToast('Oda seçilmedi!', 'error');
+                return;
+            }
+            
+            // Check if this is a DM room BEFORE making API call
+            const room = allRooms.find(r => r.room_id === currentRoomId);
+            if (room && room.member_count === 2) {
+                showToast('Bu bir direkt mesaj (DM) odası. DM\'lere üye eklenemez!', 'error');
+                closeAddMemberModal();
+                return;
+            }
+            
             // Show loading state
             const addBtn = event.target;
             const originalText = addBtn.innerHTML;
