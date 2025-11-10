@@ -35,7 +35,6 @@ import { mediaFromMxc } from "../../../customisations/Media";
 import BaseAvatar from "../avatars/BaseAvatar";
 import { SearchResultAvatar } from "../avatars/SearchResultAvatar";
 import AccessibleButton, { type ButtonEvent } from "../elements/AccessibleButton";
-import { selectText } from "../../../utils/strings";
 import Field from "../elements/Field";
 import TabbedView, { Tab, TabLocation } from "../../structures/TabbedView";
 import Dialpad from "../voip/DialPad";
@@ -44,7 +43,6 @@ import BaseDialog from "./BaseDialog";
 import DialPadBackspaceButton from "../elements/DialPadBackspaceButton";
 import LegacyCallHandler from "../../../LegacyCallHandler";
 import UserIdentifierCustomisations from "../../../customisations/UserIdentifier";
-import CopyableText from "../elements/CopyableText";
 import { type ScreenName } from "../../../PosthogTrackers";
 import { KeyBindingAction } from "../../../accessibility/KeyboardShortcuts";
 import { getKeyBindingsManager } from "../../../KeyBindingsManager";
@@ -1218,11 +1216,6 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
         this.setState({ currentTabId: tabId });
     };
 
-    private async onLinkClick(e: React.MouseEvent<HTMLAnchorElement>): Promise<void> {
-        e.preventDefault();
-        selectText(e.currentTarget);
-    }
-
     private get screenName(): ScreenName | undefined {
         switch (this.props.kind) {
             case InviteKind.Dm:
@@ -1277,21 +1270,8 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
      * errors from the previous iteration.
      */
     private renderSuggestions(): JSX.Element {
-        // If we're starting a DM, add a footer which showing our matrix.to link, for copying & pasting.
-        let footer;
-        if (this.props.kind === InviteKind.Dm) {
-            const link = makeUserPermalink(MatrixClientPeg.safeGet().getSafeUserId());
-            footer = (
-                <div className="mx_InviteDialog_footer">
-                    <h3>{_t("invite|send_link_prompt")}</h3>
-                    <CopyableText getTextToCopy={() => makeUserPermalink(MatrixClientPeg.safeGet().getSafeUserId())}>
-                        <a className="mx_InviteDialog_footer_link" href={link} onClick={this.onLinkClick}>
-                            {link}
-                        </a>
-                    </CopyableText>
-                </div>
-            );
-        }
+        // Footer removed - no Matrix invite link display
+        const footer = null;
 
         let results: React.ReactNode | null = null;
         let onlyOneThreepidNote: React.ReactNode | null = null;
