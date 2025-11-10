@@ -1345,6 +1345,18 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
 
         const cli = MatrixClientPeg.safeGet();
         const userId = cli.getUserId()!;
+        // Extract only username from Matrix ID (remove @ and domain)
+        const getUsernameFromMatrixId = (matrixId: string): string => {
+            if (!matrixId) return '';
+            let username = matrixId.startsWith('@') ? matrixId.substring(1) : matrixId;
+            const colonIndex = username.indexOf(':');
+            if (colonIndex !== -1) {
+                username = username.substring(0, colonIndex);
+            }
+            return username;
+        };
+        const displayUserId = getUsernameFromMatrixId(userId);
+        
         if (this.props.kind === InviteKind.Dm) {
             if (identityServersEnabled) {
                 helpText = _t(
@@ -1354,7 +1366,7 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
                         userId: () => {
                             return (
                                 <a href={makeUserPermalink(userId)} rel="noreferrer noopener" target="_blank">
-                                    {userId}
+                                    {displayUserId}
                                 </a>
                             );
                         },
@@ -1368,7 +1380,7 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
                         userId: () => {
                             return (
                                 <a href={makeUserPermalink(userId)} rel="noreferrer noopener" target="_blank">
-                                    {userId}
+                                    {displayUserId}
                                 </a>
                             );
                         },
@@ -1398,6 +1410,18 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
                 }
             }
 
+            // Extract only username from Matrix ID (remove @ and domain)
+            const getUsernameFromMatrixId = (matrixId: string): string => {
+                if (!matrixId) return '';
+                let username = matrixId.startsWith('@') ? matrixId.substring(1) : matrixId;
+                const colonIndex = username.indexOf(':');
+                if (colonIndex !== -1) {
+                    username = username.substring(0, colonIndex);
+                }
+                return username;
+            };
+            const displayUserId = getUsernameFromMatrixId(userId);
+            
             helpText = _t(
                 helpTextUntranslated,
                 {},
@@ -1409,7 +1433,7 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
                             rel="noreferrer noopener"
                             target="_blank"
                         >
-                            {userId}
+                            {displayUserId}
                         </a>
                     ),
                     a: (sub) => (
