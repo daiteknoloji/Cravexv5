@@ -44,6 +44,17 @@ sed -i "s|database: railway|database: $POSTGRES_DB|g" $DATA_DIR/homeserver.yaml
 sed -i "s|host: localhost|host: $POSTGRES_HOST|g" $DATA_DIR/homeserver.yaml
 sed -i "s|port: 5432|port: $POSTGRES_PORT|g" $DATA_DIR/homeserver.yaml
 
+# SMTP email password güncelle (eğer environment variable varsa)
+if [ ! -z "$SYNAPSE_EMAIL_SMTP_PASS" ]; then
+    echo "📧 Updating SMTP password from environment variable..."
+    # ${SYNAPSE_EMAIL_SMTP_PASS} formatını replace et
+    sed -i "s|\${SYNAPSE_EMAIL_SMTP_PASS}|$SYNAPSE_EMAIL_SMTP_PASS|g" $DATA_DIR/homeserver.yaml
+    # Veya direkt smtp_pass satırını replace et
+    sed -i "s|smtp_pass: \".*\"|smtp_pass: \"$SYNAPSE_EMAIL_SMTP_PASS\"|g" $DATA_DIR/homeserver.yaml
+else
+    echo "⚠️  WARNING: SYNAPSE_EMAIL_SMTP_PASS not set - email functionality may not work!"
+fi
+
 # Signing key oluştur (yoksa) - /tmp dizininde
 if [ ! -f "$DATA_DIR/signing.key" ]; then
     echo "🔑 Generating signing key..."
