@@ -2921,9 +2921,9 @@ def delete_user(user_id):
         return jsonify({'error': str(e), 'success': False}), 500
 
 @app.route('/api/users/<user_id>/threepid', methods=['POST'])
-@login_required
 def add_user_threepid(user_id):
-    """Add email or phone number to user (DATABASE ONLY - no verification)"""
+    """Add email or phone number to user (DATABASE ONLY - no verification)
+    Can be called from Element Web when SMTP fails - no login required for this endpoint"""
     try:
         medium = request.json.get('medium', '').strip().lower()  # 'email' or 'msisdn'
         address = request.json.get('address', '').strip()  # email address or phone number
