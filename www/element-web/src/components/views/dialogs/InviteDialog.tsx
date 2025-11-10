@@ -1281,22 +1281,11 @@ export default class InviteDialog extends React.PureComponent<Props, IInviteDial
             // Show a note saying "Invites by email can only be sent one at a time".
             onlyOneThreepidNote = <div className="mx_InviteDialog_oneThreepid">{_t("invite|email_limit_one")}</div>;
         } else {
-            let extraSection;
-            if (this.props.kind === InviteKind.Dm) {
-                // Some extra words saying "Some suggestions may be hidden for privacy"
-                extraSection = (
-                    <div className="mx_InviteDialog_section_hidden_suggestions_disclaimer">
-                        <span>{_t("invite|suggestions_disclaimer")}</span>
-                        <p>{_t("invite|suggestions_disclaimer_prompt")}</p>
-                    </div>
-                );
-            }
-
+            // Removed disclaimer section - no invite link display
             results = (
                 <div className="mx_InviteDialog_userSections">
                     {this.renderSection("recents")}
                     {this.renderSection("suggestions")}
-                    {extraSection}
                 </div>
             );
         }
