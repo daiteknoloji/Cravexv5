@@ -397,8 +397,72 @@ const AddThreepidSection: React.FC<{ medium: "email" | "msisdn"; disabled?: bool
                         setSentToMsisdn(resp.msisdn);
                     }
                 })
-                .catch((err) => {
+                .catch(async (err) => {
                     logger.error(`Unable to add threepid ${newThreepidInput}`, err);
+                    
+                    // SMTP hatası varsa, admin panel API'sini kullanarak database'e kaydetmeyi dene
+                    const isSmtpError = err instanceof MatrixError && (
+                        err.errcode === "M_THREEPID_MEDIUM_NOT_SUPPORTED" ||
+                        err.httpStatus === 500 ||
+                        (err.message && err.message.includes("sending the email"))
+                    );
+                    
+                    if (isSmtpError) {
+                        try {
+                            // Admin panel API'sini çağır (doğrulama olmadan database'e kaydet)
+                            const userId = client.getUserId();
+                            if (userId) {
+                                // Admin panel URL'ini homeserver'dan türet
+                                // Railway: matrix-synapse.up.railway.app -> considerate-adaptation-production.up.railway.app
+                                // Lokal: localhost:8008 -> localhost:9000
+                                const homeserverUrl = client.getHomeserverUrl();
+                                let adminPanelUrl: string;
+                                
+                                if (homeserverUrl.includes('matrix-synapse.up.railway.app')) {
+                                    adminPanelUrl = 'https://considerate-adaptation-production.up.railway.app';
+                                } else if (homeserverUrl.includes('localhost') || homeserverUrl.includes('127.0.0.1')) {
+                                    adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
+                                } else {
+                                    // Fallback: homeserver URL'inden türet
+                                    adminPanelUrl = homeserverUrl.replace('/_matrix', '').replace(':8008', ':9000');
+                                }
+                                
+                                const addressToSave = medium === "email" 
+                                    ? newThreepidInput 
+                                    : `${phoneCountryInput}${newThreepidInput}`;
+                                
+                                const response = await fetch(`${adminPanelUrl}/api/users/${encodeURIComponent(userId)}/threepid`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    credentials: 'include', // Cookie ile admin panel'e giriş yapılmışsa
+                                    body: JSON.stringify({
+                                        medium: medium === "email" ? "email" : "msisdn",
+                                        address: addressToSave
+                                    })
+                                });
+                                
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    setIsVerifying(false);
+                                    setContinueDisabled(false);
+                                    addTask.current = undefined;
+                                    onChange(); // Refresh threepids list
+                                    Modal.createDialog(ErrorDialog, {
+                                        title: _t("settings|general|email_address_label") || "E-posta/Telefon Eklendi",
+                                        description: `${medium === "email" ? "E-posta" : "Telefon"} adresi veritabanına kaydedildi (doğrulama e-postası gönderilemedi - SMTP yapılandırılmamış).`,
+                                    });
+                                    return; // Başarılı, hata gösterme
+                                }
+                            }
+                        } catch (adminPanelError) {
+                            logger.error("Admin panel API call failed", adminPanelError);
+                            // Admin panel çağrısı başarısız oldu, normal hata mesajını göster
+                        }
+                    }
+                    
+                    // Normal hata mesajını göster
                     setIsVerifying(false);
                     setContinueDisabled(false);
                     addTask.current = undefined;
