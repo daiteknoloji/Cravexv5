@@ -4431,7 +4431,14 @@ def create_admin_user():
                 'mac': mac
             }
             
+            print(f"[DEBUG] Register URL: {nonce_url}")
+            print(f"[DEBUG] Register body (without password): nonce={nonce}, username={username}, admin=True, mac={mac}")
+            print(f"[DEBUG] Password length: {len(password)}")
+            
             register_response = requests.post(nonce_url, json=register_body, timeout=10)
+            
+            print(f"[DEBUG] Register response status: {register_response.status_code}")
+            print(f"[DEBUG] Register response text: {register_response.text[:500]}")
             
             if register_response.status_code == 200:
                 user_data = register_response.json()
