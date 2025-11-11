@@ -1508,6 +1508,9 @@
             <div class="header">
                 <h1 class="header-title" id="pageTitle">Dashboard</h1>
                 <div class="header-actions">
+                    <button class="btn btn-primary btn-sm" onclick="createAdminUser()" id="createAdminBtn" style="display: none;">
+                        <i class="fas fa-user-shield"></i> Admin Kullanıcısı Oluştur
+                    </button>
                     <button class="btn btn-secondary btn-sm" onclick="loadCurrentPage()">
                         <i class="fas fa-sync"></i> Yenile
                     </button>
@@ -2097,7 +2100,10 @@
         }
         
         function loadCurrentPage() {
-            if (currentPage === 'dashboard') loadStats();
+            if (currentPage === 'dashboard') {
+                loadStats();
+                checkAdminUser();
+            }
             if (currentPage === 'rooms') loadRooms();
             if (currentPage === 'users') loadUsers();
             if (currentPage === 'deleted-users') loadDeletedUsers();
@@ -2140,6 +2146,76 @@
                 loadStats();
             }
         }, 5000);
+        
+        // Admin kullanıcısı kontrolü ve buton gösterimi
+        async function checkAdminUser() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                const adminExists = data.users && data.users.some(u => u.user_id && u.user_id.includes('@admin:'));
+                const createAdminBtn = document.getElementById('createAdminBtn');
+                if (createAdminBtn) {
+                    createAdminBtn.style.display = adminExists ? 'none' : 'inline-flex';
+                }
+            } catch (error) {
+                console.error('Admin check error:', error);
+            }
+        }
+        
+        // Admin kullanıcısı oluştur
+        async function createAdminUser() {
+            const btn = document.getElementById('createAdminBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Oluşturuluyor...';
+            }
+            
+            try {
+                const response = await fetch('/api/admin/create-admin-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'GüçlüBirŞifre123!'
+                        // registration_secret otomatik olarak environment variable'dan alınacak
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`✅ Admin kullanıcısı oluşturuldu: ${data.user_id}`, 'success');
+                    if (btn) {
+                        btn.style.display = 'none';
+                    }
+                    // Stats'ı yenile
+                    setTimeout(() => {
+                        loadStats();
+                        loadUsers();
+                    }, 1000);
+                } else {
+                    showToast(`❌ Hata: ${data.error}`, 'error');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-user-shield"></i> Admin Kullanıcısı Oluştur';
+                    }
+                }
+            } catch (error) {
+                console.error('Create admin error:', error);
+                showToast(`❌ Hata: ${error.message}`, 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-user-shield"></i> Admin Kullanıcısı Oluştur';
+                }
+            }
+        }
+        
+        // Sayfa yüklendiğinde admin kontrolü yap
+        if (currentPage === 'dashboard') {
+            checkAdminUser();
+        }
         
         // Rooms Management
         let currentRoomsPage = 1;
