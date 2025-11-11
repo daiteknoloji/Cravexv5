@@ -2155,10 +2155,17 @@
                 const adminExists = data.users && data.users.some(u => u.user_id && u.user_id.includes('@admin:'));
                 const createAdminBtn = document.getElementById('createAdminBtn');
                 if (createAdminBtn) {
-                    createAdminBtn.style.display = adminExists ? 'none' : 'inline-flex';
+                    // Admin kullanıcısı olsa bile butonu göster (password reset için)
+                    // Kullanıcı butonu manuel olarak gizleyebilir
+                    createAdminBtn.style.display = 'inline-flex';
                 }
             } catch (error) {
                 console.error('Admin check error:', error);
+                // Hata durumunda da butonu göster
+                const createAdminBtn = document.getElementById('createAdminBtn');
+                if (createAdminBtn) {
+                    createAdminBtn.style.display = 'inline-flex';
+                }
             }
         }
         
