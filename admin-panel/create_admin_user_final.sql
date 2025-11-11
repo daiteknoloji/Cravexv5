@@ -16,13 +16,13 @@ VALUES (
     EXTRACT(EPOCH FROM NOW()) * 1000,  -- milliseconds
     1,  -- admin = 1 (admin kullanıcısı)
     0,  -- deactivated = 0 (aktif)
-    0,  -- locked = 0 (kilitli değil)
+    false,  -- locked = false (kilitli değil) - BOOLEAN tipi için false kullan
     NULL  -- user_type = NULL (normal kullanıcı)
 )
 ON CONFLICT (name) DO UPDATE SET
     admin = 1,
     deactivated = 0,
-    locked = 0,
+    locked = false,  -- BOOLEAN tipi için false kullan
     password_hash = '$2b$12$DF.xpPwZa3zXGjB7qzjqbe//ekEaBZ/SBGlS58ILkxDzbuF7jOrim';  -- Hash'i güncelle
 
 -- Kontrol sorgusu

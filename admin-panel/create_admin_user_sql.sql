@@ -18,13 +18,13 @@ VALUES (
     EXTRACT(EPOCH FROM NOW()) * 1000,  -- milliseconds
     1,  -- admin = 1 (admin kullanıcısı)
     0,  -- deactivated = 0 (aktif)
-    0,  -- locked = 0 (kilitli değil)
+    false,  -- locked = false (kilitli değil) - BOOLEAN tipi için false kullan
     NULL  -- user_type = NULL (normal kullanıcı)
 )
 ON CONFLICT (name) DO UPDATE SET
     admin = 1,
     deactivated = 0,
-    locked = 0;
+    locked = false;  -- BOOLEAN tipi için false kullan
 
 -- Kontrol sorgusu
 SELECT name, admin, deactivated, locked, creation_ts FROM users WHERE name = '@admin:matrix-synapse.up.railway.app';
