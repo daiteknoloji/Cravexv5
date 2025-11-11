@@ -4371,6 +4371,8 @@ def create_admin_user():
                 }), 400
         
         print(f"[DEBUG] Using registration secret (first 10 chars): {registration_secret[:10]}...")
+        print(f"[DEBUG] Registration secret length: {len(registration_secret)}")
+        print(f"[DEBUG] Registration secret (full): {registration_secret}")
         
         # Get homeserver domain and synapse URL
         homeserver_domain = os.getenv('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
