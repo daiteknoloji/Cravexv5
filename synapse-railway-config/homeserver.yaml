@@ -2,7 +2,7 @@
 server_name: "matrix-synapse.up.railway.app"
 pid_file: /tmp/homeserver.pid
 public_baseurl: "https://matrix-synapse.up.railway.app/"
-web_client_location: "https://vcravex1.netlify.app"
+web_client_location: "https://surprising-emotion-production.up.railway.app"
 serve_server_wellknown: true
 
 ## Ports ##
@@ -21,13 +21,15 @@ listeners:
 experimental_features:
   msc3886_endpoint: /refresh
 
-# Allow CORS from Netlify domains
+# Allow CORS from Railway domains
 # Railway'de reverse proxy var, bu yüzden CORS headers'ı doğru şekilde göndermeliyiz
 cors_allowed_origins:
+  - "https://surprising-emotion-production.up.railway.app"
   - "https://vcravex1.netlify.app"
   - "https://cravex-admin.netlify.app"
   - "https://cozy-dragon-54547b.netlify.app"
   - "https://matrix-synapse.up.railway.app"
+  - "https://considerate-adaptation-production.up.railway.app"
 
 ## Database ##
 database:
