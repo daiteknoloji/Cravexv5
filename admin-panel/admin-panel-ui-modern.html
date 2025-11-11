@@ -2234,7 +2234,14 @@
             container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><div class="loading-text">Odalar yükleniyor...</div></div>';
             
             try {
-                const response = await fetch('/api/rooms');
+                // Cache busting için timestamp ekle
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/rooms?t=${timestamp}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
                 const data = await response.json();
                 
                 allRooms = data.rooms;
