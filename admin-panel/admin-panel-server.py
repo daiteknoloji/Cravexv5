@@ -900,6 +900,11 @@ DASHBOARD_TEMPLATE = '''
                 <div class="stat-value">100%</div>
                 <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
             </div>
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn-primary" onclick="loadStats()" style="padding: 10px 20px;">
+                    <i class="fas fa-sync-alt"></i> Yenile
+                </button>
+            </div>
         </div>
         
         <!-- Filters -->
@@ -977,7 +982,16 @@ DASHBOARD_TEMPLATE = '''
         
         async function loadStats() {
             try {
-                const response = await fetch('/api/stats');
+                // Cache'i bypass etmek için timestamp ekle
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/stats?t=${timestamp}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
                 const stats = await response.json();
                 
                 document.getElementById('totalMessages').textContent = stats.total_messages.toLocaleString();
@@ -987,6 +1001,16 @@ DASHBOARD_TEMPLATE = '''
                 console.error('Stats yüklenirken hata:', error);
             }
         }
+        
+        // Sayfa görünür olduğunda stats'ı yenile (tab değişiminde)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                loadStats();
+            }
+        });
+        
+        // Her 5 saniyede bir stats'ı otomatik yenile
+        setInterval(loadStats, 5000);
         
         function searchMessages() {
             currentPage = 1;
@@ -1275,11 +1299,18 @@ def get_stats():
         cur.close()
         conn.close()
         
-        return jsonify({
+        response = jsonify({
             'total_messages': total_messages,
             'total_rooms': total_rooms,
             'total_users': total_users
         })
+        
+        # Cache'i devre dışı bırak
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        return response
     except Exception as e:
         print(f"[HATA] /api/stats - {str(e)}")
         return jsonify({'error': str(e)}), 500

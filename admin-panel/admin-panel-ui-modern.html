@@ -2107,7 +2107,16 @@
         // Stats
         async function loadStats() {
             try {
-                const response = await fetch('/api/stats');
+                // Cache'i bypass etmek için timestamp ekle
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/stats?t=${timestamp}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
                 const stats = await response.json();
                 
                 document.getElementById('stat-messages').textContent = stats.total_messages.toLocaleString();
@@ -2117,6 +2126,20 @@
                 console.error('Stats load error:', error);
             }
         }
+        
+        // Sayfa görünür olduğunda stats'ı yenile (tab değişiminde)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && currentPage === 'dashboard') {
+                loadStats();
+            }
+        });
+        
+        // Her 5 saniyede bir stats'ı otomatik yenile (sadece dashboard'da)
+        setInterval(function() {
+            if (currentPage === 'dashboard') {
+                loadStats();
+            }
+        }, 5000);
         
         // Rooms Management
         let currentRoomsPage = 1;
