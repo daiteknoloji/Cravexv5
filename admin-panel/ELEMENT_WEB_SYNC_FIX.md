@@ -10,10 +10,14 @@ Element Web'in IndexedDB'sinde saklanan sync token geçersiz hale gelmiş. Büy�
 
 ### Yöntem 1: Browser Console'dan Sync Token'ı Temizleme (HIZLI - ÖNERİLEN)
 
+**ÖNEMLİ:** Bu script'i çalıştırdıktan sonra **logout yapıp tekrar login olmanız gerekiyor!**
+
 1. Element Web'i açın ve login olun
 2. Browser Developer Tools'u açın (F12)
 3. Console sekmesine gidin
-4. Aşağıdaki kodu yapıştırıp Enter'a basın:
+4. `admin-panel/clear_sync_token.js` dosyasındaki kodu kopyalayıp yapıştırın
+5. Enter'a basın
+6. Script çalıştıktan sonra **logout yapın ve tekrar login olun**
 
 ```javascript
 // IndexedDB'deki sync token'ı temizle ve fresh sync başlat
