@@ -4405,11 +4405,13 @@ def create_admin_user():
             print(f"[INFO] Nonce received: {nonce}")
             print(f"[DEBUG] Registration secret length: {len(registration_secret)}")
             print(f"[DEBUG] Username: {username}, Password length: {len(password)}")
+            print(f"[DEBUG] Full registration secret: {registration_secret}")
             
             # Step 2: Calculate HMAC signature
             # Format: nonce + NULL + username + NULL + password + NULL + admin
             message = f"{nonce}\x00{username}\x00{password}\x00admin"
-            print(f"[DEBUG] HMAC message (first 50 chars): {repr(message[:50])}")
+            print(f"[DEBUG] HMAC message (first 100 chars): {repr(message[:100])}")
+            print(f"[DEBUG] HMAC message length: {len(message)}")
             
             mac = hmac.new(
                 registration_secret.encode('utf-8'),
@@ -4418,6 +4420,7 @@ def create_admin_user():
             ).hexdigest()
             
             print(f"[DEBUG] Calculated MAC: {mac}")
+            print(f"[DEBUG] MAC length: {len(mac)}")
             
             # Step 3: Register admin user
             register_body = {
