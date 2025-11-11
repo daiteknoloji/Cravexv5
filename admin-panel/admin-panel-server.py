@@ -30,9 +30,9 @@ DB_CONFIG = {
     'port': int(os.getenv('PGPORT', '5432'))
 }
 
-# Admin kullanıcı bilgileri
-ADMIN_USERNAME = 'admin'
-ADMIN_PASSWORD = 'admin123'
+# Admin kullanıcı bilgileri (Environment variable'dan oku, yoksa default kullan)
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
 
 # Homeserver domain (Railway or localhost)
 HOMESERVER_DOMAIN = os.getenv('HOMESERVER_DOMAIN', 'localhost')
