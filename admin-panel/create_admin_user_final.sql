@@ -12,7 +12,7 @@ SELECT name, admin, deactivated FROM users WHERE name LIKE '@admin:%';
 INSERT INTO users (name, password_hash, creation_ts, admin, deactivated, locked, user_type)
 VALUES (
     '@admin:matrix-synapse.up.railway.app',
-    '$2b$12$DF.xpPwZa3zXGjB7qzjqbe//ekEaBZ/SBGlS58ILkxDzbuF7jOrim',  -- GucluBirSifre123! için hash
+    '$2b$12$FGKyY303UV/fEYEvUHFkKORQsmNH4vjDArTqbfvv3f3eXiFmWnRS6',  -- GucluBirSifre123! için hash
     EXTRACT(EPOCH FROM NOW()) * 1000,  -- milliseconds
     1,  -- admin = 1 (admin kullanıcısı)
     0,  -- deactivated = 0 (aktif)
@@ -23,7 +23,7 @@ ON CONFLICT (name) DO UPDATE SET
     admin = 1,
     deactivated = 0,
     locked = false,  -- BOOLEAN tipi için false kullan
-    password_hash = '$2b$12$DF.xpPwZa3zXGjB7qzjqbe//ekEaBZ/SBGlS58ILkxDzbuF7jOrim';  -- Hash'i güncelle
+    password_hash = '$2b$12$FGKyY303UV/fEYEvUHFkKORQsmNH4vjDArTqbfvv3f3eXiFmWnRS6';  -- Hash'i güncelle
 
 -- Kontrol sorgusu
 SELECT name, admin, deactivated, locked, creation_ts FROM users WHERE name = '@admin:matrix-synapse.up.railway.app';
