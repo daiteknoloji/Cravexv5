@@ -4329,6 +4329,21 @@ def proxy_media_thumbnail(server_name, media_id):
                 'details': error_text,
                 'requested_url': thumbnail_url
             }), response.status_code
+            
+    except requests.exceptions.RequestException as e:
+        print(f"[HATA] Thumbnail proxy error: {str(e)}")
+        return jsonify({
+            'errcode': 'M_UNKNOWN',
+            'error': f'Thumbnail proxy error: {str(e)}'
+        }), 500
+    except Exception as e:
+        print(f"[HATA] Thumbnail proxy error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'errcode': 'M_UNKNOWN',
+            'error': str(e)
+        }), 500
 
 @app.route('/api/admin/create-admin-user', methods=['POST'])
 @login_required
@@ -4436,21 +4451,6 @@ def create_admin_user():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e), 'success': False}), 500
-            
-    except requests.exceptions.RequestException as e:
-        print(f"[HATA] Thumbnail proxy error: {str(e)}")
-        return jsonify({
-            'errcode': 'M_UNKNOWN',
-            'error': f'Thumbnail proxy error: {str(e)}'
-        }), 500
-    except Exception as e:
-        print(f"[HATA] Thumbnail proxy error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'errcode': 'M_UNKNOWN',
-            'error': str(e)
-        }), 500
 
 if __name__ == '__main__':
     print("")
