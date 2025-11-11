@@ -46,7 +46,9 @@ SELECT COUNT(*) as kalan_kullanici_sayisi FROM users;
 -- ============================================
 -- SEÇENEK 2: BELİRLİ DOMAIN'DEKİ KULLANICILARI SİL
 -- ============================================
--- Örnek: cravexv5-production.up.railway.app domain'indeki kullanıcıları silmek için
+-- ⚠️ NOT: Aşağıdaki örneklerde eski domain (cravexv5-production.up.railway.app) kullanılmıştır
+-- Güncel domain: matrix-synapse.up.railway.app
+-- Örnek: matrix-synapse.up.railway.app domain'indeki kullanıcıları silmek için
 
 -- ÖNCE KONTROL EDİN:
 SELECT 
@@ -54,35 +56,35 @@ SELECT
     split_part(name, ':', 1) as kullanici_adi,
     split_part(name, ':', 2) as domain
 FROM users
-WHERE split_part(name, ':', 2) = 'cravexv5-production.up.railway.app'
+WHERE split_part(name, ':', 2) = 'matrix-synapse.up.railway.app'  -- ⚠️ Domain'i güncelleyin!
 ORDER BY name;
 
 -- SİLME İŞLEMİ (Domain adını değiştirin):
 DELETE FROM local_current_membership
-WHERE user_id LIKE '%:cravexv5-production.up.railway.app';
+WHERE user_id LIKE '%:matrix-synapse.up.railway.app';  -- ⚠️ Domain'i güncelleyin!
 
 DELETE FROM room_memberships
-WHERE user_id LIKE '%:cravexv5-production.up.railway.app';
+WHERE user_id LIKE '%:matrix-synapse.up.railway.app';  -- ⚠️ Domain'i güncelleyin!
 
 DELETE FROM user_directory
-WHERE user_id LIKE '%:cravexv5-production.up.railway.app';
+WHERE user_id LIKE '%:matrix-synapse.up.railway.app';  -- ⚠️ Domain'i güncelleyin!
 
 DELETE FROM profiles
-WHERE user_id LIKE '%:cravexv5-production.up.railway.app';
+WHERE user_id LIKE '%:matrix-synapse.up.railway.app';  -- ⚠️ Domain'i güncelleyin!
 
 DELETE FROM users
-WHERE split_part(name, ':', 2) = 'cravexv5-production.up.railway.app';
+WHERE split_part(name, ':', 2) = 'matrix-synapse.up.railway.app';  -- ⚠️ Domain'i güncelleyin!
 
 -- DOĞRULAMA
 SELECT COUNT(*) as kalan_kullanici_sayisi
 FROM users
-WHERE split_part(name, ':', 2) = 'cravexv5-production.up.railway.app';
+WHERE split_part(name, ':', 2) = 'matrix-synapse.up.railway.app';  -- ⚠️ Domain'i güncelleyin!
 -- Sonuç 0 olmalı!
 
 -- ============================================
 -- SEÇENEK 3: BELİRLİ KULLANICILARI SİL (ID ile)
 -- ============================================
--- Örnek: @1canli:cravexv5-production.up.railway.app kullanıcısını silmek için
+-- Örnek: @1canli:matrix-synapse.up.railway.app kullanıcısını silmek için
 
 -- ÖNCE KONTROL EDİN:
 SELECT 
@@ -91,62 +93,62 @@ SELECT
     split_part(name, ':', 2) as domain
 FROM users
 WHERE name IN (
-    '@1canli:cravexv5-production.up.railway.app',
-    '@2canli:cravexv5-production.up.railway.app',
-    '@zohan:cravexv5-production.up.railway.app',
-    '@stark:cravexv5-production.up.railway.app'
+    '@1canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@2canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@zohan:matrix-synapse.up.railway.app',   -- ⚠️ Domain'i güncelleyin!
+    '@stark:matrix-synapse.up.railway.app'   -- ⚠️ Domain'i güncelleyin!
 )
 ORDER BY name;
 
 -- SİLME İŞLEMİ (Kullanıcı ID'lerini değiştirin):
 DELETE FROM local_current_membership
 WHERE user_id IN (
-    '@1canli:cravexv5-production.up.railway.app',
-    '@2canli:cravexv5-production.up.railway.app',
-    '@zohan:cravexv5-production.up.railway.app',
-    '@stark:cravexv5-production.up.railway.app'
+    '@1canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@2canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@zohan:matrix-synapse.up.railway.app',   -- ⚠️ Domain'i güncelleyin!
+    '@stark:matrix-synapse.up.railway.app'    -- ⚠️ Domain'i güncelleyin!
 );
 
 DELETE FROM room_memberships
 WHERE user_id IN (
-    '@1canli:cravexv5-production.up.railway.app',
-    '@2canli:cravexv5-production.up.railway.app',
-    '@zohan:cravexv5-production.up.railway.app',
-    '@stark:cravexv5-production.up.railway.app'
+    '@1canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@2canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@zohan:matrix-synapse.up.railway.app',   -- ⚠️ Domain'i güncelleyin!
+    '@stark:matrix-synapse.up.railway.app'    -- ⚠️ Domain'i güncelleyin!
 );
 
 DELETE FROM user_directory
 WHERE user_id IN (
-    '@1canli:cravexv5-production.up.railway.app',
-    '@2canli:cravexv5-production.up.railway.app',
-    '@zohan:cravexv5-production.up.railway.app',
-    '@stark:cravexv5-production.up.railway.app'
+    '@1canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@2canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@zohan:matrix-synapse.up.railway.app',   -- ⚠️ Domain'i güncelleyin!
+    '@stark:matrix-synapse.up.railway.app'    -- ⚠️ Domain'i güncelleyin!
 );
 
 DELETE FROM profiles
 WHERE user_id IN (
-    '@1canli:cravexv5-production.up.railway.app',
-    '@2canli:cravexv5-production.up.railway.app',
-    '@zohan:cravexv5-production.up.railway.app',
-    '@stark:cravexv5-production.up.railway.app'
+    '@1canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@2canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@zohan:matrix-synapse.up.railway.app',   -- ⚠️ Domain'i güncelleyin!
+    '@stark:matrix-synapse.up.railway.app'    -- ⚠️ Domain'i güncelleyin!
 );
 
 DELETE FROM users
 WHERE name IN (
-    '@1canli:cravexv5-production.up.railway.app',
-    '@2canli:cravexv5-production.up.railway.app',
-    '@zohan:cravexv5-production.up.railway.app',
-    '@stark:cravexv5-production.up.railway.app'
+    '@1canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@2canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@zohan:matrix-synapse.up.railway.app',   -- ⚠️ Domain'i güncelleyin!
+    '@stark:matrix-synapse.up.railway.app'    -- ⚠️ Domain'i güncelleyin!
 );
 
 -- DOĞRULAMA
 SELECT name as kalan_kullanici
 FROM users
 WHERE name IN (
-    '@1canli:cravexv5-production.up.railway.app',
-    '@2canli:cravexv5-production.up.railway.app',
-    '@zohan:cravexv5-production.up.railway.app',
-    '@stark:cravexv5-production.up.railway.app'
+    '@1canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@2canli:matrix-synapse.up.railway.app',  -- ⚠️ Domain'i güncelleyin!
+    '@zohan:matrix-synapse.up.railway.app',   -- ⚠️ Domain'i güncelleyin!
+    '@stark:matrix-synapse.up.railway.app'    -- ⚠️ Domain'i güncelleyin!
 );
 -- Sonuç boş olmalı!
 
