@@ -4370,6 +4370,8 @@ def create_admin_user():
                     'success': False
                 }), 400
         
+        print(f"[DEBUG] Using registration secret (first 10 chars): {registration_secret[:10]}...")
+        
         # Get homeserver domain and synapse URL
         homeserver_domain = os.getenv('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
         synapse_url = os.getenv('SYNAPSE_URL')
@@ -4399,14 +4401,21 @@ def create_admin_user():
                 }), 500
             
             print(f"[INFO] Nonce received: {nonce}")
+            print(f"[DEBUG] Registration secret length: {len(registration_secret)}")
+            print(f"[DEBUG] Username: {username}, Password length: {len(password)}")
             
             # Step 2: Calculate HMAC signature
+            # Format: nonce + NULL + username + NULL + password + NULL + admin
             message = f"{nonce}\x00{username}\x00{password}\x00admin"
+            print(f"[DEBUG] HMAC message (first 50 chars): {repr(message[:50])}")
+            
             mac = hmac.new(
                 registration_secret.encode('utf-8'),
                 message.encode('utf-8'),
                 hashlib.sha1
             ).hexdigest()
+            
+            print(f"[DEBUG] Calculated MAC: {mac}")
             
             # Step 3: Register admin user
             register_body = {
