@@ -3400,6 +3400,11 @@ def create_user():
                         'success': False
                     }), 500
                 
+                print(f"[DEBUG] Registration secret (first 10 chars): {registration_secret[:10]}...")
+                print(f"[DEBUG] Registration secret length: {len(registration_secret)}")
+                print(f"[DEBUG] Registration secret (full): {registration_secret}")
+                print(f"[DEBUG] Registration secret (repr): {repr(registration_secret)}")
+                
                 # Get homeserver domain and synapse URL
                 homeserver_domain = get_env_var('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
                 synapse_url = get_env_var('SYNAPSE_URL', '')
@@ -3429,11 +3434,16 @@ def create_user():
                         }), 500
                     
                     print(f"[INFO] Nonce received: {nonce}")
+                    print(f"[DEBUG] Username: {username}, Password length: {len(password)}, Admin: {make_admin}")
                     
                     # Step 2: Calculate HMAC signature
                     # Format: nonce + NULL + username + NULL + password + NULL + admin (or notadmin)
                     admin_flag = 'admin' if make_admin else 'notadmin'
                     message = f"{nonce}\x00{username}\x00{password}\x00{admin_flag}"
+                    
+                    print(f"[DEBUG] HMAC message (first 100 chars): {repr(message[:100])}")
+                    print(f"[DEBUG] HMAC message length: {len(message)}")
+                    print(f"[DEBUG] HMAC message bytes: {message.encode('utf-8')[:100]}")
                     
                     mac = hmac.new(
                         registration_secret.encode('utf-8'),
@@ -3442,6 +3452,7 @@ def create_user():
                     ).hexdigest()
                     
                     print(f"[DEBUG] Calculated MAC: {mac}")
+                    print(f"[DEBUG] MAC length: {len(mac)}")
                     
                     # Step 3: Register user
                     register_body = {
