@@ -27,7 +27,10 @@ def get_env_var(key, default):
     value = os.getenv(key, default)
     if value and isinstance(value, str):
         # Tırnak işaretlerini temizle (Railway bazen tırnak içinde saklıyor)
-        value = value.strip().strip('"').strip("'")
+        # Birden fazla kez temizle (çift tırnak durumları için)
+        while value.startswith('"') or value.startswith("'") or value.endswith('"') or value.endswith("'"):
+            value = value.strip().strip('"').strip("'").strip()
+        value = value.strip()
     return value
 
 DB_CONFIG = {
