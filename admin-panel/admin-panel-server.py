@@ -1284,14 +1284,15 @@ def login():
         
         # Always try ADMIN_PASSWORD as well (even if same as user password, in case user typed wrong)
         admin_password = get_env_var('ADMIN_PASSWORD', '')
+        print(f"[DEBUG] ADMIN_PASSWORD check: {'FOUND' if admin_password else 'NOT FOUND'}")
         if admin_password:
-            print(f"[DEBUG] ADMIN_PASSWORD found, will try with ADMIN_PASSWORD as well")
+            print(f"[DEBUG] ADMIN_PASSWORD found (length: {len(admin_password)}), will try with ADMIN_PASSWORD as well")
             login_attempts.extend([
                 {'user': username, 'password': admin_password},
                 {'user': f'@{username}:{HOMESERVER_DOMAIN}', 'password': admin_password}
             ])
         else:
-            print(f"[DEBUG] ADMIN_PASSWORD not found in environment variables")
+            print(f"[DEBUG] ADMIN_PASSWORD not found in environment variables - only user-provided password will be tried")
         
         last_error = None
         for attempt in login_attempts:
