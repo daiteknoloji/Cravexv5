@@ -1973,30 +1973,79 @@ def add_room_member(room_id):
         
         # Get Synapse URL (for both auto-login and API calls)
         import requests
-        synapse_url = os.getenv('SYNAPSE_URL', 'http://localhost:8008')
+        synapse_url = get_env_var('SYNAPSE_URL', '')
+        if not synapse_url:
+            homeserver_domain = get_env_var('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
+            if homeserver_domain and homeserver_domain != 'localhost':
+                synapse_url = f'https://{homeserver_domain}'
+            else:
+                synapse_url = 'http://localhost:8008'
         
-        # If no token, try auto-login
+        # If no token, try auto-login (same logic as create_user)
         if not admin_token:
-            admin_username = os.getenv('ADMIN_USERNAME', 'admin')
-            admin_password = os.getenv('ADMIN_PASSWORD')
+            admin_username = get_env_var('ADMIN_USERNAME', 'admin')
+            admin_password = get_env_var('ADMIN_PASSWORD', '')
+            
+            # Try both admin username and full admin user ID
+            login_attempts = [
+                {'user': admin_username},
+                {'user': ADMIN_USER_ID}
+            ]
             
             if admin_password:
-                print(f"[INFO] No admin token, attempting auto-login...")
-                try:
-                    login_response = requests.post(
-                        f'{synapse_url}/_matrix/client/v3/login',
-                        json={
-                            'type': 'm.login.password',
-                            'identifier': {'type': 'm.id.user', 'user': admin_username},
-                            'password': admin_password
-                        },
-                        timeout=10
-                    )
-                    if login_response.status_code == 200:
-                        admin_token = login_response.json().get('access_token')
-                        print(f"[INFO] Auto-login successful for member add!")
-                except Exception as e:
-                    print(f"[WARN] Auto-login failed: {e}")
+                print(f"[INFO] No admin token, attempting auto-login for member add...")
+                print(f"[DEBUG] Using admin_username: {admin_username}, synapse_url: {synapse_url}")
+                
+                for attempt in login_attempts:
+                    try:
+                        login_response = requests.post(
+                            f'{synapse_url}/_matrix/client/v3/login',
+                            json={
+                                'type': 'm.login.password',
+                                'identifier': {
+                                    'type': 'm.id.user',
+                                    'user': attempt['user']
+                                },
+                                'password': admin_password
+                            },
+                            timeout=10
+                        )
+                        
+                        if login_response.status_code == 200:
+                            admin_token = login_response.json().get('access_token')
+                            print(f"[INFO] Auto-login successful for member add! Token obtained: {admin_token[:20]}...")
+                            
+                            # Save token to database for future use
+                            try:
+                                conn_token = get_db_connection()
+                                cur_token = conn_token.cursor()
+                                # Check if token already exists
+                                cur_token.execute(
+                                    "SELECT id FROM access_tokens WHERE user_id = %s AND token = %s LIMIT 1",
+                                    (ADMIN_USER_ID, admin_token)
+                                )
+                                if not cur_token.fetchone():
+                                    # Insert new token
+                                    cur_token.execute(
+                                        "INSERT INTO access_tokens (user_id, token) VALUES (%s, %s)",
+                                        (ADMIN_USER_ID, admin_token)
+                                    )
+                                    conn_token.commit()
+                                    print(f"[INFO] Admin token saved to database for future use")
+                                else:
+                                    print(f"[INFO] Admin token already exists in database")
+                                cur_token.close()
+                                conn_token.close()
+                            except Exception as save_error:
+                                print(f"[WARN] Could not save admin token to database: {save_error}")
+                            
+                            break  # Success, exit loop
+                        else:
+                            print(f"[WARN] Auto-login failed for {attempt['user']}: {login_response.status_code} - {login_response.text[:100]}")
+                    except Exception as login_error:
+                        print(f"[WARN] Auto-login error for {attempt['user']}: {login_error}")
+            else:
+                print(f"[WARN] ADMIN_PASSWORD not set in environment variables")
         
         if not admin_token:
             return jsonify({'error': 'Admin not logged in. Please set ADMIN_PASSWORD environment variable.', 'success': False}), 401
