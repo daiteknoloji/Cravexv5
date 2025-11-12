@@ -2772,56 +2772,50 @@ def remove_room_member(room_id, user_id):
                 print(f"[WARN] Matrix API check/join error: {api_err} - will update database only")
         
         # Update database regardless of API result
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Generate unique event_id - use existing event_id if available, otherwise create new one
+        # Generate unique event_id with robust uniqueness checking
         import uuid
         import time
         import random
         
-        # If current event_id exists and is valid, we can append a suffix to make it unique
-        # Otherwise, generate a completely new one
-        if current_event_id and current_event_id:
-            # Use existing event_id as base and append removal suffix
-            base_event_id = current_event_id.replace('$', '').replace('!', '')
-            event_id = f"$admin_remove_{base_event_id}_{int(time.time()*1000000)}_{random.randint(10000, 99999)}"
-        else:
-            # Generate completely new event_id with high uniqueness
-            event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{random.randint(100000, 999999)}"
-        
-        # Double-check uniqueness (with retry if needed)
-        max_attempts = 5
-        for attempt in range(max_attempts):
-            cur.execute("""
-                SELECT COUNT(*) FROM room_memberships WHERE event_id = %s
-            """, (event_id,))
-            
-            if cur.fetchone()[0] == 0:
-                break  # Unique, use this event_id
-            
-            # If not unique, generate a new one with more randomness
-            event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{random.randint(1000000, 9999999)}_{attempt}"
-        
         # Update membership to 'leave'
         # Handle duplicate event_id gracefully with transaction rollback and connection reset
-        max_retries = 3
+        max_retries = 5
         affected = 0
+        event_id = None
         
         for retry in range(max_retries):
             try:
                 # Close previous connection if retrying
                 if retry > 0:
                     try:
-                        cur.close()
-                        conn.close()
+                        if 'cur' in locals():
+                            cur.close()
+                        if 'conn' in locals():
+                            conn.close()
                     except:
                         pass
-                    
-                    # Open new connection for retry
-                    conn = get_db_connection()
-                    cur = conn.cursor()
                 
+                # Open new connection for each attempt
+                conn = get_db_connection()
+                cur = conn.cursor()
+                
+                # Generate a completely unique event_id for this attempt
+                # Use full UUID (32 chars) + timestamp + random + retry number for maximum uniqueness
+                import os
+                pid = os.getpid()
+                event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{pid}_{retry}_{random.randint(10000000, 99999999)}"
+                
+                # Check uniqueness before attempting update
+                cur.execute("""
+                    SELECT COUNT(*) FROM room_memberships WHERE event_id = %s
+                """, (event_id,))
+                
+                if cur.fetchone()[0] > 0:
+                    # Event ID already exists, generate a new one
+                    print(f"[WARN] Event ID collision detected, generating new one (attempt {retry + 1})")
+                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{pid}_{retry}_{random.randint(100000000, 999999999)}"
+                
+                # Now attempt the update
                 cur.execute("""
                     UPDATE room_memberships 
                     SET membership = 'leave', event_id = %s
@@ -2830,12 +2824,20 @@ def remove_room_member(room_id, user_id):
                 
                 conn.commit()
                 affected = cur.rowcount
-                break  # Success, exit retry loop
+                
+                if affected > 0:
+                    print(f"[INFO] ✅ Successfully updated membership to 'leave' with event_id: {event_id}")
+                    break  # Success, exit retry loop
+                else:
+                    # No rows affected - member might already be removed
+                    print(f"[INFO] No rows affected - member may already be removed")
+                    break
                 
             except Exception as update_err:
                 # Check if it's a duplicate key error
-                if 'duplicate key' in str(update_err).lower() or 'unique constraint' in str(update_err).lower():
-                    print(f"[WARN] Event ID conflict (attempt {retry + 1}/{max_retries}), generating new one: {update_err}")
+                error_str = str(update_err).lower()
+                if 'duplicate key' in error_str or 'unique constraint' in error_str:
+                    print(f"[WARN] Event ID conflict (attempt {retry + 1}/{max_retries}): {update_err}")
                     
                     # Rollback the failed transaction
                     try:
@@ -2843,18 +2845,32 @@ def remove_room_member(room_id, user_id):
                     except:
                         pass
                     
-                    # Generate a new event_id with more randomness (include retry number, full UUID, and large random)
-                    import random
-                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{retry}_{random.randint(1000000, 9999999)}"
-                    
-                    # If this was the last retry, raise the error
+                    # If this was the last retry, try one more time with even more randomness
                     if retry == max_retries - 1:
                         print(f"[ERROR] Failed to generate unique event_id after {max_retries} attempts")
-                        cur.close()
-                        conn.close()
-                        raise
+                        # Last resort: use a completely random approach
+                        try:
+                            event_id = f"$admin_remove_{uuid.uuid4().hex}_{uuid.uuid4().hex}_{random.randint(1000000000, 9999999999)}"
+                            cur.execute("""
+                                UPDATE room_memberships 
+                                SET membership = 'leave', event_id = %s
+                                WHERE room_id = %s AND user_id = %s AND membership != 'leave'
+                            """, (event_id, room_id, user_id))
+                            conn.commit()
+                            affected = cur.rowcount
+                            if affected > 0:
+                                print(f"[INFO] ✅ Successfully updated with last-resort event_id: {event_id}")
+                                break
+                        except Exception as last_err:
+                            print(f"[ERROR] Last resort update also failed: {last_err}")
+                            cur.close()
+                            conn.close()
+                            raise update_err  # Raise original error
+                    # Continue to next retry
+                    continue
                 else:
                     # For other errors, rollback and raise
+                    print(f"[ERROR] Database update error: {update_err}")
                     try:
                         conn.rollback()
                     except:
@@ -2863,8 +2879,14 @@ def remove_room_member(room_id, user_id):
                     conn.close()
                     raise
         
-        cur.close()
-        conn.close()
+        # Clean up connection
+        try:
+            if 'cur' in locals():
+                cur.close()
+            if 'conn' in locals():
+                conn.close()
+        except:
+            pass
         
         if affected > 0:
             return jsonify({
