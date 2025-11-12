@@ -2641,12 +2641,16 @@ def remove_room_member(room_id, user_id):
             return jsonify({'message': 'Member not found in room', 'success': False}), 404
         
         current_membership = result[0]
+        current_event_id = result[1] if len(result) > 1 else None
         
         # If already left, no need to update
         if current_membership == 'leave':
             cur.close()
             conn.close()
             return jsonify({'message': 'Member already removed', 'success': True})
+        
+        # If current event_id exists and is not null, we can reuse it to avoid conflicts
+        # But we'll still generate a new one to track the removal action
         
         # Get admin token for Matrix API call
         cur.execute(
@@ -2764,29 +2768,42 @@ def remove_room_member(room_id, user_id):
             event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:8]}"
         
         # Update membership to 'leave'
-        # Use ON CONFLICT to handle duplicate event_id gracefully
-        try:
-            cur.execute("""
-                UPDATE room_memberships 
-                SET membership = 'leave', event_id = %s
-                WHERE room_id = %s AND user_id = %s AND membership != 'leave'
-            """, (event_id, room_id, user_id))
-        except Exception as update_err:
-            # If event_id conflict, try with a new one
-            if 'duplicate key' in str(update_err).lower() or 'unique constraint' in str(update_err).lower():
-                print(f"[WARN] Event ID conflict, generating new one: {update_err}")
-                event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:12]}"
+        # Handle duplicate event_id gracefully with transaction rollback
+        max_retries = 3
+        affected = 0
+        
+        for retry in range(max_retries):
+            try:
                 cur.execute("""
                     UPDATE room_memberships 
                     SET membership = 'leave', event_id = %s
                     WHERE room_id = %s AND user_id = %s AND membership != 'leave'
                 """, (event_id, room_id, user_id))
-            else:
-                raise
+                
+                conn.commit()
+                affected = cur.rowcount
+                break  # Success, exit retry loop
+                
+            except Exception as update_err:
+                # Check if it's a duplicate key error
+                if 'duplicate key' in str(update_err).lower() or 'unique constraint' in str(update_err).lower():
+                    print(f"[WARN] Event ID conflict (attempt {retry + 1}/{max_retries}), generating new one: {update_err}")
+                    
+                    # Rollback the failed transaction
+                    conn.rollback()
+                    
+                    # Generate a new event_id with more randomness
+                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:16]}_{retry}"
+                    
+                    # If this was the last retry, raise the error
+                    if retry == max_retries - 1:
+                        print(f"[ERROR] Failed to generate unique event_id after {max_retries} attempts")
+                        raise
+                else:
+                    # For other errors, rollback and raise
+                    conn.rollback()
+                    raise
         
-        conn.commit()
-        
-        affected = cur.rowcount
         cur.close()
         conn.close()
         
