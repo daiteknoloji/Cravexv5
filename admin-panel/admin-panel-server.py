@@ -2717,29 +2717,44 @@ def remove_room_member(room_id, user_id):
                     except:
                         continue
         
-        # Try Matrix API kick/leave
+        # Try Matrix API kick/leave using Client API (Admin API doesn't have kick endpoint)
         if admin_token:
             headers = {
                 'Authorization': f'Bearer {admin_token}',
                 'Content-Type': 'application/json'
             }
             
-            # Try Admin API kick first
+            # Try Client API kick (requires admin to be in room)
             try:
-                kick_url = f'{synapse_url}/_synapse/admin/v1/rooms/{room_id}/kick'
+                kick_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/kick'
                 kick_response = requests.post(
                     kick_url,
                     headers=headers,
-                    json={'user_id': user_id},
+                    json={'user_id': user_id, 'reason': 'Removed by admin'},
                     timeout=10
                 )
                 
                 if kick_response.status_code == 200:
-                    print(f"[INFO] ✅ User kicked via Admin API: {user_id}")
+                    print(f"[INFO] ✅ User kicked via Client API: {user_id}")
                 else:
-                    print(f"[WARN] Admin API kick failed: {kick_response.status_code} - {kick_response.text[:200]}")
+                    print(f"[WARN] Client API kick failed: {kick_response.status_code} - {kick_response.text[:200]}")
+                    # If kick fails, try sending leave state event instead
+                    try:
+                        leave_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/state/m.room.member/{user_id}'
+                        leave_response = requests.put(
+                            leave_url,
+                            headers=headers,
+                            json={'membership': 'leave'},
+                            timeout=10
+                        )
+                        if leave_response.status_code in [200, 204]:
+                            print(f"[INFO] ✅ User removed via state event: {user_id}")
+                        else:
+                            print(f"[WARN] State event failed: {leave_response.status_code} - {leave_response.text[:200]}")
+                    except Exception as state_err:
+                        print(f"[WARN] State event error: {state_err}")
             except Exception as api_err:
-                print(f"[WARN] Admin API kick error: {api_err}")
+                print(f"[WARN] Client API kick error: {api_err}")
         
         # Update database regardless of API result
         conn = get_db_connection()
@@ -2768,12 +2783,24 @@ def remove_room_member(room_id, user_id):
             event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:8]}"
         
         # Update membership to 'leave'
-        # Handle duplicate event_id gracefully with transaction rollback
+        # Handle duplicate event_id gracefully with transaction rollback and connection reset
         max_retries = 3
         affected = 0
         
         for retry in range(max_retries):
             try:
+                # Close previous connection if retrying
+                if retry > 0:
+                    try:
+                        cur.close()
+                        conn.close()
+                    except:
+                        pass
+                    
+                    # Open new connection for retry
+                    conn = get_db_connection()
+                    cur = conn.cursor()
+                
                 cur.execute("""
                     UPDATE room_memberships 
                     SET membership = 'leave', event_id = %s
@@ -2790,18 +2817,29 @@ def remove_room_member(room_id, user_id):
                     print(f"[WARN] Event ID conflict (attempt {retry + 1}/{max_retries}), generating new one: {update_err}")
                     
                     # Rollback the failed transaction
-                    conn.rollback()
+                    try:
+                        conn.rollback()
+                    except:
+                        pass
                     
-                    # Generate a new event_id with more randomness
-                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:16]}_{retry}"
+                    # Generate a new event_id with more randomness (include retry number and microsecond timestamp)
+                    import random
+                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:16]}_{retry}_{random.randint(1000, 9999)}"
                     
                     # If this was the last retry, raise the error
                     if retry == max_retries - 1:
                         print(f"[ERROR] Failed to generate unique event_id after {max_retries} attempts")
+                        cur.close()
+                        conn.close()
                         raise
                 else:
                     # For other errors, rollback and raise
-                    conn.rollback()
+                    try:
+                        conn.rollback()
+                    except:
+                        pass
+                    cur.close()
+                    conn.close()
                     raise
         
         cur.close()
