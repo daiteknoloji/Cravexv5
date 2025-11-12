@@ -3388,11 +3388,99 @@ def create_user():
                         'success': False
                     }), 500
             else:
-                print(f"[ERROR] Admin token not found and auto-login failed!")
-                return jsonify({
-                    'error': 'Matrix Admin API requires admin token. Please ensure ADMIN_PASSWORD is set correctly.',
-                    'success': False
-                }), 500
+                # Admin token yoksa, REGISTRATION_SHARED_SECRET kullanarak kullanıcı oluştur
+                print(f"[INFO] Admin token not found, trying registration shared secret method...")
+                import hmac
+                import hashlib
+                
+                registration_secret = get_env_var('REGISTRATION_SHARED_SECRET', '')
+                if not registration_secret:
+                    return jsonify({
+                        'error': 'Admin token not found and REGISTRATION_SHARED_SECRET not set. Please set ADMIN_PASSWORD or REGISTRATION_SHARED_SECRET.',
+                        'success': False
+                    }), 500
+                
+                # Get homeserver domain and synapse URL
+                homeserver_domain = get_env_var('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
+                synapse_url = get_env_var('SYNAPSE_URL', '')
+                if not synapse_url:
+                    if homeserver_domain and homeserver_domain != 'localhost':
+                        synapse_url = f'https://{homeserver_domain}'
+                    else:
+                        synapse_url = 'http://localhost:8008'
+                
+                # Step 1: Get nonce from Synapse
+                nonce_url = f'{synapse_url}/_synapse/admin/v1/register'
+                try:
+                    nonce_response = requests.get(nonce_url, timeout=10)
+                    if nonce_response.status_code != 200:
+                        return jsonify({
+                            'error': f'Failed to get nonce: {nonce_response.status_code} - {nonce_response.text[:200]}',
+                            'success': False
+                        }), 500
+                    
+                    nonce_data = nonce_response.json()
+                    nonce = nonce_data.get('nonce')
+                    
+                    if not nonce:
+                        return jsonify({
+                            'error': 'No nonce received from Synapse',
+                            'success': False
+                        }), 500
+                    
+                    print(f"[INFO] Nonce received: {nonce}")
+                    
+                    # Step 2: Calculate HMAC signature
+                    # Format: nonce + NULL + username + NULL + password + NULL + admin (or notadmin)
+                    admin_flag = 'admin' if make_admin else 'notadmin'
+                    message = f"{nonce}\x00{username}\x00{password}\x00{admin_flag}"
+                    
+                    mac = hmac.new(
+                        registration_secret.encode('utf-8'),
+                        message.encode('utf-8'),
+                        hashlib.sha1
+                    ).hexdigest()
+                    
+                    print(f"[DEBUG] Calculated MAC: {mac}")
+                    
+                    # Step 3: Register user
+                    register_body = {
+                        'nonce': nonce,
+                        'username': username,
+                        'password': password,
+                        'admin': make_admin,
+                        'mac': mac
+                    }
+                    
+                    register_response = requests.post(nonce_url, json=register_body, timeout=10)
+                    
+                    if register_response.status_code == 200:
+                        user_data = register_response.json()
+                        created_user_id = user_data.get('user_id', user_id)
+                        
+                        print(f"[INFO] User created successfully via registration shared secret: {created_user_id}")
+                        
+                        return jsonify({
+                            'success': True,
+                            'user_id': created_user_id,
+                            'username': username,
+                            'message': f'User {created_user_id} created successfully via registration shared secret!',
+                            'method': 'registration_secret'
+                        })
+                    else:
+                        error_text = register_response.text[:500]
+                        print(f"[ERROR] Registration failed: {register_response.status_code} - {error_text}")
+                        return jsonify({
+                            'error': f'Registration failed: {register_response.status_code} - {error_text}',
+                            'success': False
+                        }), 500
+                        
+                except requests.exceptions.RequestException as req_error:
+                    print(f"[ERROR] Request error: {req_error}")
+                    return jsonify({
+                        'error': f'Request error: {str(req_error)}',
+                        'success': False
+                    }), 500
         except Exception as api_error:
             print(f"[ERROR] Matrix API error: {api_error}")
             import traceback
