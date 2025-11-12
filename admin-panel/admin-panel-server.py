@@ -4455,6 +4455,30 @@ def proxy_media_thumbnail(server_name, media_id):
             'error': str(e)
         }), 500
 
+@app.route('/api/debug/check-secret', methods=['GET'])
+@login_required
+def check_secret():
+    """Debug endpoint to check REGISTRATION_SHARED_SECRET value"""
+    try:
+        raw_secret = os.getenv('REGISTRATION_SHARED_SECRET', 'NOT_SET')
+        cleaned_secret = get_env_var('REGISTRATION_SHARED_SECRET', 'NOT_SET')
+        
+        return jsonify({
+            'success': True,
+            'raw_secret_length': len(raw_secret) if raw_secret != 'NOT_SET' else 0,
+            'raw_secret_first_10': raw_secret[:10] if raw_secret != 'NOT_SET' else 'NOT_SET',
+            'raw_secret_repr': repr(raw_secret),
+            'cleaned_secret_length': len(cleaned_secret) if cleaned_secret != 'NOT_SET' else 0,
+            'cleaned_secret_first_10': cleaned_secret[:10] if cleaned_secret != 'NOT_SET' else 'NOT_SET',
+            'cleaned_secret_repr': repr(cleaned_secret),
+            'cleaned_secret_full': cleaned_secret if cleaned_secret != 'NOT_SET' else 'NOT_SET'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/admin/create-admin-user', methods=['POST'])
 @login_required
 def create_admin_user():
