@@ -55,6 +55,16 @@ else
     echo "⚠️  WARNING: SYNAPSE_EMAIL_SMTP_PASS not set - email functionality may not work!"
 fi
 
+# Registration shared secret güncelle (eğer environment variable varsa)
+if [ ! -z "$REGISTRATION_SHARED_SECRET" ]; then
+    echo "🔐 Updating registration shared secret from environment variable..."
+    # registration_shared_secret satırını replace et
+    sed -i "s|registration_shared_secret: \".*\"|registration_shared_secret: \"$REGISTRATION_SHARED_SECRET\"|g" $DATA_DIR/homeserver.yaml
+    echo "✅ Registration shared secret updated!"
+else
+    echo "⚠️  WARNING: REGISTRATION_SHARED_SECRET not set - registration may not work!"
+fi
+
 # Signing key oluştur (yoksa) - /tmp dizininde
 if [ ! -f "$DATA_DIR/signing.key" ]; then
     echo "🔑 Generating signing key..."
