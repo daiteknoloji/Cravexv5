@@ -1271,14 +1271,20 @@ def login():
             else:
                 synapse_url = 'http://localhost:8008'
         
+        print(f"[DEBUG] Attempting Matrix login for username: {username}")
+        print(f"[DEBUG] Synapse URL: {synapse_url}")
+        print(f"[DEBUG] HOMESERVER_DOMAIN: {HOMESERVER_DOMAIN}")
+        
         # Try login with username (can be localpart or full user ID)
         login_attempts = [
             {'user': username},
             {'user': f'@{username}:{HOMESERVER_DOMAIN}'}
         ]
         
+        last_error = None
         for attempt in login_attempts:
             try:
+                print(f"[DEBUG] Trying Matrix login with user: {attempt['user']}")
                 login_response = requests.post(
                     f'{synapse_url}/_matrix/client/v3/login',
                     json={
@@ -1292,6 +1298,9 @@ def login():
                     timeout=10
                 )
                 
+                print(f"[DEBUG] Matrix login response status: {login_response.status_code}")
+                print(f"[DEBUG] Matrix login response: {login_response.text[:200]}")
+                
                 if login_response.status_code == 200:
                     # Success! Matrix login worked - check if user is admin
                     login_data = login_response.json()
@@ -1303,14 +1312,28 @@ def login():
                     session['logged_in'] = True
                     session['username'] = username
                     session['matrix_user_id'] = matrix_user_id
-                    print(f"[INFO] Matrix login successful for {matrix_user_id}")
+                    print(f"[INFO] ✅ Matrix login successful for {matrix_user_id}")
                     return redirect(url_for('index'))
+                else:
+                    # Store error for display
+                    try:
+                        error_data = login_response.json()
+                        last_error = error_data.get('error', f'HTTP {login_response.status_code}')
+                    except:
+                        last_error = f'HTTP {login_response.status_code}: {login_response.text[:100]}'
+                    print(f"[WARN] Matrix login failed for {attempt['user']}: {last_error}")
             except Exception as login_error:
+                last_error = str(login_error)
                 print(f"[WARN] Matrix login error for {attempt['user']}: {login_error}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         # If all login attempts failed
-        return render_template_string(LOGIN_TEMPLATE, error='Kullanıcı adı veya şifre hatalı!')
+        error_msg = 'Kullanıcı adı veya şifre hatalı!'
+        if last_error:
+            error_msg += f' (Matrix: {last_error})'
+        return render_template_string(LOGIN_TEMPLATE, error=error_msg)
     
     return render_template_string(LOGIN_TEMPLATE)
 
