@@ -1254,12 +1254,63 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
+        # First check environment variable credentials (for backward compatibility)
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session['logged_in'] = True
             session['username'] = username
             return redirect(url_for('index'))
-        else:
-            return render_template_string(LOGIN_TEMPLATE, error='Kullanıcı adı veya şifre hatalı!')
+        
+        # Also try Matrix Synapse login (for cravexadmin and other Matrix users)
+        # This allows login with Matrix credentials even if ADMIN_USERNAME doesn't match
+        import requests
+        synapse_url = get_env_var('SYNAPSE_URL', '')
+        if not synapse_url:
+            homeserver_domain = get_env_var('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
+            if homeserver_domain and homeserver_domain != 'localhost':
+                synapse_url = f'https://{homeserver_domain}'
+            else:
+                synapse_url = 'http://localhost:8008'
+        
+        # Try login with username (can be localpart or full user ID)
+        login_attempts = [
+            {'user': username},
+            {'user': f'@{username}:{HOMESERVER_DOMAIN}'}
+        ]
+        
+        for attempt in login_attempts:
+            try:
+                login_response = requests.post(
+                    f'{synapse_url}/_matrix/client/v3/login',
+                    json={
+                        'type': 'm.login.password',
+                        'identifier': {
+                            'type': 'm.id.user',
+                            'user': attempt['user']
+                        },
+                        'password': password
+                    },
+                    timeout=10
+                )
+                
+                if login_response.status_code == 200:
+                    # Success! Matrix login worked - check if user is admin
+                    login_data = login_response.json()
+                    matrix_user_id = login_data.get('user_id', '')
+                    
+                    # Check if user is admin (has admin privileges in Synapse)
+                    # For now, allow any Matrix user to login to admin panel
+                    # You can add additional checks here if needed
+                    session['logged_in'] = True
+                    session['username'] = username
+                    session['matrix_user_id'] = matrix_user_id
+                    print(f"[INFO] Matrix login successful for {matrix_user_id}")
+                    return redirect(url_for('index'))
+            except Exception as login_error:
+                print(f"[WARN] Matrix login error for {attempt['user']}: {login_error}")
+                continue
+        
+        # If all login attempts failed
+        return render_template_string(LOGIN_TEMPLATE, error='Kullanıcı adı veya şifre hatalı!')
     
     return render_template_string(LOGIN_TEMPLATE)
 
