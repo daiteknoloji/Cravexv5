@@ -1276,19 +1276,22 @@ def login():
         print(f"[DEBUG] HOMESERVER_DOMAIN: {HOMESERVER_DOMAIN}")
         
         # Try login with username (can be localpart or full user ID)
-        # Also try with ADMIN_PASSWORD if user-provided password fails
+        # Also try with ADMIN_PASSWORD environment variable
         login_attempts = [
             {'user': username, 'password': password},
             {'user': f'@{username}:{HOMESERVER_DOMAIN}', 'password': password}
         ]
         
-        # If user-provided password fails, also try ADMIN_PASSWORD
+        # Always try ADMIN_PASSWORD as well (even if same as user password, in case user typed wrong)
         admin_password = get_env_var('ADMIN_PASSWORD', '')
-        if admin_password and admin_password != password:
+        if admin_password:
+            print(f"[DEBUG] ADMIN_PASSWORD found, will try with ADMIN_PASSWORD as well")
             login_attempts.extend([
                 {'user': username, 'password': admin_password},
                 {'user': f'@{username}:{HOMESERVER_DOMAIN}', 'password': admin_password}
             ])
+        else:
+            print(f"[DEBUG] ADMIN_PASSWORD not found in environment variables")
         
         last_error = None
         for attempt in login_attempts:
