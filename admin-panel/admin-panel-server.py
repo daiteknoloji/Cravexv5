@@ -1276,15 +1276,24 @@ def login():
         print(f"[DEBUG] HOMESERVER_DOMAIN: {HOMESERVER_DOMAIN}")
         
         # Try login with username (can be localpart or full user ID)
+        # Also try with ADMIN_PASSWORD if user-provided password fails
         login_attempts = [
-            {'user': username},
-            {'user': f'@{username}:{HOMESERVER_DOMAIN}'}
+            {'user': username, 'password': password},
+            {'user': f'@{username}:{HOMESERVER_DOMAIN}', 'password': password}
         ]
+        
+        # If user-provided password fails, also try ADMIN_PASSWORD
+        admin_password = get_env_var('ADMIN_PASSWORD', '')
+        if admin_password and admin_password != password:
+            login_attempts.extend([
+                {'user': username, 'password': admin_password},
+                {'user': f'@{username}:{HOMESERVER_DOMAIN}', 'password': admin_password}
+            ])
         
         last_error = None
         for attempt in login_attempts:
             try:
-                print(f"[DEBUG] Trying Matrix login with user: {attempt['user']}")
+                print(f"[DEBUG] Trying Matrix login with user: {attempt['user']}, password: {'***' if attempt['password'] else 'NONE'}")
                 login_response = requests.post(
                     f'{synapse_url}/_matrix/client/v3/login',
                     json={
@@ -1293,7 +1302,7 @@ def login():
                             'type': 'm.id.user',
                             'user': attempt['user']
                         },
-                        'password': password
+                        'password': attempt['password']
                     },
                     timeout=10
                 )
