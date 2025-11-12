@@ -2717,59 +2717,104 @@ def remove_room_member(room_id, user_id):
                     except:
                         continue
         
-        # Try Matrix API kick/leave using Client API (Admin API doesn't have kick endpoint)
-        # Note: Admin must be in the room and have sufficient power level to kick users
+        # Try Matrix API kick/leave - Use Admin API first, then fallback to Client API
+        matrix_api_success = False
         if admin_token:
             headers = {
                 'Authorization': f'Bearer {admin_token}',
                 'Content-Type': 'application/json'
             }
             
-            # First, ensure admin is in the room (join if not already)
+            # Strategy 1: Try Admin API to remove user (doesn't require admin to be in room)
             try:
-                # Check if admin is in room
-                membership_check_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/joined_members'
-                membership_response = requests.get(membership_check_url, headers=headers, timeout=10)
-                
-                admin_in_room = False
-                if membership_response.status_code == 200:
-                    joined_members = membership_response.json().get('joined', {})
-                    admin_in_room = admin_user_id_for_room in joined_members
-                
-                # If admin not in room, try to join
-                if not admin_in_room:
-                    print(f"[INFO] Admin not in room, attempting to join...")
-                    join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
-                    join_response = requests.post(join_url, headers=headers, json={}, timeout=10)
-                    if join_response.status_code in [200, 201, 204]:
-                        print(f"[INFO] ✅ Admin joined room successfully")
-                        admin_in_room = True
+                # Check if admin token is an admin token (starts with 'syt_')
+                if admin_token.startswith('syt_'):
+                    # This is an admin token, try Admin API
+                    # Admin API: Use PUT /_synapse/admin/v1/rooms/{room_id}/state/{event_type}/{state_key}
+                    # to create a state event that removes the user
+                    admin_api_state_url = f'{synapse_url}/_synapse/admin/v1/rooms/{room_id}/state/m.room.member/{user_id}'
+                    admin_state_response = requests.put(
+                        admin_api_state_url,
+                        headers=headers,
+                        json={'membership': 'leave'},
+                        timeout=10
+                    )
+                    
+                    if admin_state_response.status_code in [200, 201, 204]:
+                        print(f"[INFO] ✅ User removed via Admin API state event: {user_id}")
+                        matrix_api_success = True
                     else:
-                        print(f"[WARN] Failed to join room: {join_response.status_code} - {join_response.text[:200]}")
-                
-                # Try Client API kick (requires admin to be in room and have power level)
-                if admin_in_room:
-                    try:
-                        kick_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/kick'
-                        kick_response = requests.post(
-                            kick_url,
-                            headers=headers,
-                            json={'user_id': user_id, 'reason': 'Removed by admin'},
-                            timeout=10
-                        )
-                        
-                        if kick_response.status_code == 200:
-                            print(f"[INFO] ✅ User kicked via Client API: {user_id}")
-                        else:
-                            print(f"[WARN] Client API kick failed: {kick_response.status_code} - {kick_response.text[:200]}")
-                            # If kick fails due to permissions, we'll still update database
-                            # Matrix API is optional - database update is primary
-                    except Exception as kick_err:
-                        print(f"[WARN] Client API kick error: {kick_err}")
+                        print(f"[WARN] Admin API state event failed: {admin_state_response.status_code} - {admin_state_response.text[:200]}")
+                        # Fallback: Try using Admin API to send a membership event directly
+                        # This requires creating a proper Matrix event
+                        print(f"[INFO] Admin API state event failed, will try Client API...")
                 else:
-                    print(f"[WARN] Admin not in room, skipping Matrix API kick (will update database only)")
-            except Exception as api_err:
-                print(f"[WARN] Matrix API check/join error: {api_err} - will update database only")
+                    print(f"[INFO] Token is not an admin token, trying Client API...")
+            except Exception as admin_api_err:
+                print(f"[WARN] Admin API error: {admin_api_err}")
+            
+            # Strategy 2: If Admin API failed, try Client API with state event
+            if not matrix_api_success:
+                try:
+                    # First, ensure admin is in the room (join if not already)
+                    membership_check_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/joined_members'
+                    membership_response = requests.get(membership_check_url, headers=headers, timeout=10)
+                    
+                    admin_in_room = False
+                    if membership_response.status_code == 200:
+                        joined_members = membership_response.json().get('joined', {})
+                        admin_in_room = admin_user_id_for_room in joined_members
+                    
+                    # If admin not in room, try to join
+                    if not admin_in_room:
+                        print(f"[INFO] Admin not in room, attempting to join...")
+                        join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                        join_response = requests.post(join_url, headers=headers, json={}, timeout=10)
+                        if join_response.status_code in [200, 201, 204]:
+                            print(f"[INFO] ✅ Admin joined room successfully")
+                            admin_in_room = True
+                        else:
+                            print(f"[WARN] Failed to join room: {join_response.status_code} - {join_response.text[:200]}")
+                    
+                    # Try Client API kick (requires admin to be in room and have power level)
+                    if admin_in_room:
+                        try:
+                            kick_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/kick'
+                            kick_response = requests.post(
+                                kick_url,
+                                headers=headers,
+                                json={'user_id': user_id, 'reason': 'Removed by admin'},
+                                timeout=10
+                            )
+                            
+                            if kick_response.status_code == 200:
+                                print(f"[INFO] ✅ User kicked via Client API: {user_id}")
+                                matrix_api_success = True
+                            else:
+                                print(f"[WARN] Client API kick failed: {kick_response.status_code} - {kick_response.text[:200]}")
+                                # Fallback: Try state event method
+                                print(f"[INFO] Trying state event method as fallback...")
+                                state_event_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/state/m.room.member/{user_id}'
+                                state_event_response = requests.put(
+                                    state_event_url,
+                                    headers=headers,
+                                    json={'membership': 'leave'},
+                                    timeout=10
+                                )
+                                if state_event_response.status_code in [200, 201, 204]:
+                                    print(f"[INFO] ✅ User removed via state event: {user_id}")
+                                    matrix_api_success = True
+                                else:
+                                    print(f"[WARN] State event method also failed: {state_event_response.status_code} - {state_event_response.text[:200]}")
+                        except Exception as kick_err:
+                            print(f"[WARN] Client API kick error: {kick_err}")
+                    else:
+                        print(f"[WARN] Admin not in room, skipping Matrix API kick (will update database only)")
+                except Exception as api_err:
+                    print(f"[WARN] Matrix API check/join error: {api_err} - will update database only")
+            
+            if not matrix_api_success:
+                print(f"[WARN] ⚠️ Matrix API kick failed - database will be updated but Element Web may not sync immediately")
         
         # Update database regardless of API result
         # Use a simpler approach: try to update without changing event_id first, if that fails, generate new one
