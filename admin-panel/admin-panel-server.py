@@ -2718,69 +2718,90 @@ def remove_room_member(room_id, user_id):
                         continue
         
         # Try Matrix API kick/leave using Client API (Admin API doesn't have kick endpoint)
+        # Note: Admin must be in the room and have sufficient power level to kick users
         if admin_token:
             headers = {
                 'Authorization': f'Bearer {admin_token}',
                 'Content-Type': 'application/json'
             }
             
-            # Try Client API kick (requires admin to be in room)
+            # First, ensure admin is in the room (join if not already)
             try:
-                kick_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/kick'
-                kick_response = requests.post(
-                    kick_url,
-                    headers=headers,
-                    json={'user_id': user_id, 'reason': 'Removed by admin'},
-                    timeout=10
-                )
+                # Check if admin is in room
+                membership_check_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/joined_members'
+                membership_response = requests.get(membership_check_url, headers=headers, timeout=10)
                 
-                if kick_response.status_code == 200:
-                    print(f"[INFO] ✅ User kicked via Client API: {user_id}")
-                else:
-                    print(f"[WARN] Client API kick failed: {kick_response.status_code} - {kick_response.text[:200]}")
-                    # If kick fails, try sending leave state event instead
+                admin_in_room = False
+                if membership_response.status_code == 200:
+                    joined_members = membership_response.json().get('joined', {})
+                    admin_in_room = admin_user_id_for_room in joined_members
+                
+                # If admin not in room, try to join
+                if not admin_in_room:
+                    print(f"[INFO] Admin not in room, attempting to join...")
+                    join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
+                    join_response = requests.post(join_url, headers=headers, json={}, timeout=10)
+                    if join_response.status_code in [200, 201, 204]:
+                        print(f"[INFO] ✅ Admin joined room successfully")
+                        admin_in_room = True
+                    else:
+                        print(f"[WARN] Failed to join room: {join_response.status_code} - {join_response.text[:200]}")
+                
+                # Try Client API kick (requires admin to be in room and have power level)
+                if admin_in_room:
                     try:
-                        leave_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/state/m.room.member/{user_id}'
-                        leave_response = requests.put(
-                            leave_url,
+                        kick_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/kick'
+                        kick_response = requests.post(
+                            kick_url,
                             headers=headers,
-                            json={'membership': 'leave'},
+                            json={'user_id': user_id, 'reason': 'Removed by admin'},
                             timeout=10
                         )
-                        if leave_response.status_code in [200, 204]:
-                            print(f"[INFO] ✅ User removed via state event: {user_id}")
+                        
+                        if kick_response.status_code == 200:
+                            print(f"[INFO] ✅ User kicked via Client API: {user_id}")
                         else:
-                            print(f"[WARN] State event failed: {leave_response.status_code} - {leave_response.text[:200]}")
-                    except Exception as state_err:
-                        print(f"[WARN] State event error: {state_err}")
+                            print(f"[WARN] Client API kick failed: {kick_response.status_code} - {kick_response.text[:200]}")
+                            # If kick fails due to permissions, we'll still update database
+                            # Matrix API is optional - database update is primary
+                    except Exception as kick_err:
+                        print(f"[WARN] Client API kick error: {kick_err}")
+                else:
+                    print(f"[WARN] Admin not in room, skipping Matrix API kick (will update database only)")
             except Exception as api_err:
-                print(f"[WARN] Client API kick error: {api_err}")
+                print(f"[WARN] Matrix API check/join error: {api_err} - will update database only")
         
         # Update database regardless of API result
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Generate unique event_id using uuid - ensure it's unique
+        # Generate unique event_id - use existing event_id if available, otherwise create new one
         import uuid
         import time
-        max_attempts = 10
-        event_id = None
+        import random
         
+        # If current event_id exists and is valid, we can append a suffix to make it unique
+        # Otherwise, generate a completely new one
+        if current_event_id and current_event_id:
+            # Use existing event_id as base and append removal suffix
+            base_event_id = current_event_id.replace('$', '').replace('!', '')
+            event_id = f"$admin_remove_{base_event_id}_{int(time.time()*1000000)}_{random.randint(10000, 99999)}"
+        else:
+            # Generate completely new event_id with high uniqueness
+            event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{random.randint(100000, 999999)}"
+        
+        # Double-check uniqueness (with retry if needed)
+        max_attempts = 5
         for attempt in range(max_attempts):
-            candidate_event_id = f"$admin_remove_{int(time.time()*1000)}_{uuid.uuid4().hex[:16]}"
-            
-            # Check if this event_id already exists
             cur.execute("""
                 SELECT COUNT(*) FROM room_memberships WHERE event_id = %s
-            """, (candidate_event_id,))
+            """, (event_id,))
             
             if cur.fetchone()[0] == 0:
-                event_id = candidate_event_id
-                break
-        
-        if not event_id:
-            # Fallback: use timestamp + random
-            event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:8]}"
+                break  # Unique, use this event_id
+            
+            # If not unique, generate a new one with more randomness
+            event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{random.randint(1000000, 9999999)}_{attempt}"
         
         # Update membership to 'leave'
         # Handle duplicate event_id gracefully with transaction rollback and connection reset
@@ -2822,9 +2843,9 @@ def remove_room_member(room_id, user_id):
                     except:
                         pass
                     
-                    # Generate a new event_id with more randomness (include retry number and microsecond timestamp)
+                    # Generate a new event_id with more randomness (include retry number, full UUID, and large random)
                     import random
-                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:16]}_{retry}_{random.randint(1000, 9999)}"
+                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{retry}_{random.randint(1000000, 9999999)}"
                     
                     # If this was the last retry, raise the error
                     if retry == max_retries - 1:
