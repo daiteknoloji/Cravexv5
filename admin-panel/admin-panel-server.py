@@ -22,20 +22,28 @@ app.secret_key = 'cravex-admin-secret-key-2024'
 # PostgreSQL bağlantısı - Railway ortam değişkenlerinden
 import os
 
+def get_env_var(key, default):
+    """Environment variable'ı oku ve tırnak işaretlerini temizle (Railway uyumluluğu için)"""
+    value = os.getenv(key, default)
+    if value and isinstance(value, str):
+        # Tırnak işaretlerini temizle (Railway bazen tırnak içinde saklıyor)
+        value = value.strip().strip('"').strip("'")
+    return value
+
 DB_CONFIG = {
-    'host': os.getenv('PGHOST', 'localhost'),
-    'database': os.getenv('PGDATABASE', 'synapse'),
-    'user': os.getenv('PGUSER', 'synapse_user'),
-    'password': os.getenv('PGPASSWORD', 'SuperGucluSifre2024!'),
-    'port': int(os.getenv('PGPORT', '5432'))
+    'host': get_env_var('PGHOST', 'localhost'),
+    'database': get_env_var('PGDATABASE', 'synapse'),
+    'user': get_env_var('PGUSER', 'synapse_user'),
+    'password': get_env_var('PGPASSWORD', 'SuperGucluSifre2024!'),
+    'port': int(get_env_var('PGPORT', '5432'))
 }
 
 # Admin kullanıcı bilgileri (Environment variable'dan oku, yoksa default kullan)
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
+ADMIN_USERNAME = get_env_var('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = get_env_var('ADMIN_PASSWORD', 'admin123')
 
 # Homeserver domain (Railway or localhost)
-HOMESERVER_DOMAIN = os.getenv('HOMESERVER_DOMAIN', 'localhost')
+HOMESERVER_DOMAIN = get_env_var('HOMESERVER_DOMAIN', 'localhost')
 ADMIN_USER_ID = f'@admin:{HOMESERVER_DOMAIN}'
 
 def get_db_connection():
@@ -4363,7 +4371,7 @@ def create_admin_user():
         
         if not registration_secret:
             # Try to get from environment variable
-            registration_secret = os.getenv('REGISTRATION_SHARED_SECRET')
+            registration_secret = get_env_var('REGISTRATION_SHARED_SECRET', '')
             if not registration_secret:
                 return jsonify({
                     'error': 'Registration shared secret required. Set REGISTRATION_SHARED_SECRET environment variable or provide in request.',
@@ -4375,8 +4383,8 @@ def create_admin_user():
         print(f"[DEBUG] Registration secret (full): {registration_secret}")
         
         # Get homeserver domain and synapse URL
-        homeserver_domain = os.getenv('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
-        synapse_url = os.getenv('SYNAPSE_URL')
+        homeserver_domain = get_env_var('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
+        synapse_url = get_env_var('SYNAPSE_URL', '')
         if not synapse_url:
             if homeserver_domain and homeserver_domain != 'localhost':
                 synapse_url = f'https://{homeserver_domain}'
@@ -4497,5 +4505,5 @@ if __name__ == '__main__':
     print("=" * 60)
     print("")
     
-    port = int(os.getenv('PORT', '9000'))
+    port = int(get_env_var('PORT', '9000'))
     app.run(host='0.0.0.0', port=port, debug=False)
