@@ -2772,121 +2772,122 @@ def remove_room_member(room_id, user_id):
                 print(f"[WARN] Matrix API check/join error: {api_err} - will update database only")
         
         # Update database regardless of API result
-        # Generate unique event_id with robust uniqueness checking
+        # Use a simpler approach: try to update without changing event_id first, if that fails, generate new one
         import uuid
         import time
         import random
+        import os
         
-        # Update membership to 'leave'
-        # Handle duplicate event_id gracefully with transaction rollback and connection reset
-        max_retries = 5
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Strategy: First try to update without changing event_id (if current_event_id is unique)
+        # If that fails due to duplicate key, generate a new unique event_id
+        
         affected = 0
-        event_id = None
         
-        for retry in range(max_retries):
+        # Check if current_event_id is unique (not used by other records)
+        use_current_event_id = False
+        if current_event_id:
+            cur.execute("""
+                SELECT COUNT(*) FROM room_memberships 
+                WHERE event_id = %s AND (room_id != %s OR user_id != %s)
+            """, (current_event_id, room_id, user_id))
+            if cur.fetchone()[0] == 0:
+                # Current event_id is unique, we can keep it
+                use_current_event_id = True
+        
+        if use_current_event_id:
+            # Try update keeping the same event_id
             try:
-                # Close previous connection if retrying
-                if retry > 0:
-                    try:
-                        if 'cur' in locals():
-                            cur.close()
-                        if 'conn' in locals():
-                            conn.close()
-                    except:
-                        pass
-                
-                # Open new connection for each attempt
-                conn = get_db_connection()
-                cur = conn.cursor()
-                
-                # Generate a completely unique event_id for this attempt
-                # Use full UUID (32 chars) + timestamp + random + retry number for maximum uniqueness
-                import os
-                pid = os.getpid()
-                event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{pid}_{retry}_{random.randint(10000000, 99999999)}"
-                
-                # Check uniqueness before attempting update
-                cur.execute("""
-                    SELECT COUNT(*) FROM room_memberships WHERE event_id = %s
-                """, (event_id,))
-                
-                if cur.fetchone()[0] > 0:
-                    # Event ID already exists, generate a new one
-                    print(f"[WARN] Event ID collision detected, generating new one (attempt {retry + 1})")
-                    event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex}_{pid}_{retry}_{random.randint(100000000, 999999999)}"
-                
-                # Now attempt the update
                 cur.execute("""
                     UPDATE room_memberships 
-                    SET membership = 'leave', event_id = %s
+                    SET membership = 'leave'
                     WHERE room_id = %s AND user_id = %s AND membership != 'leave'
-                """, (event_id, room_id, user_id))
-                
+                """, (room_id, user_id))
                 conn.commit()
                 affected = cur.rowcount
-                
                 if affected > 0:
-                    print(f"[INFO] ✅ Successfully updated membership to 'leave' with event_id: {event_id}")
-                    break  # Success, exit retry loop
-                else:
-                    # No rows affected - member might already be removed
-                    print(f"[INFO] No rows affected - member may already be removed")
-                    break
-                
-            except Exception as update_err:
-                # Check if it's a duplicate key error
-                error_str = str(update_err).lower()
-                if 'duplicate key' in error_str or 'unique constraint' in error_str:
-                    print(f"[WARN] Event ID conflict (attempt {retry + 1}/{max_retries}): {update_err}")
-                    
-                    # Rollback the failed transaction
-                    try:
-                        conn.rollback()
-                    except:
-                        pass
-                    
-                    # If this was the last retry, try one more time with even more randomness
-                    if retry == max_retries - 1:
-                        print(f"[ERROR] Failed to generate unique event_id after {max_retries} attempts")
-                        # Last resort: use a completely random approach
-                        try:
-                            event_id = f"$admin_remove_{uuid.uuid4().hex}_{uuid.uuid4().hex}_{random.randint(1000000000, 9999999999)}"
-                            cur.execute("""
-                                UPDATE room_memberships 
-                                SET membership = 'leave', event_id = %s
-                                WHERE room_id = %s AND user_id = %s AND membership != 'leave'
-                            """, (event_id, room_id, user_id))
-                            conn.commit()
-                            affected = cur.rowcount
-                            if affected > 0:
-                                print(f"[INFO] ✅ Successfully updated with last-resort event_id: {event_id}")
-                                break
-                        except Exception as last_err:
-                            print(f"[ERROR] Last resort update also failed: {last_err}")
-                            cur.close()
-                            conn.close()
-                            raise update_err  # Raise original error
-                    # Continue to next retry
-                    continue
-                else:
-                    # For other errors, rollback and raise
-                    print(f"[ERROR] Database update error: {update_err}")
-                    try:
-                        conn.rollback()
-                    except:
-                        pass
+                    print(f"[INFO] ✅ Successfully updated membership to 'leave' (kept existing event_id)")
                     cur.close()
                     conn.close()
-                    raise
+                else:
+                    print(f"[INFO] No rows affected - member may already be removed")
+                    cur.close()
+                    conn.close()
+            except Exception as e:
+                print(f"[WARN] Update with existing event_id failed: {e}, will try with new event_id")
+                conn.rollback()
+                use_current_event_id = False
         
-        # Clean up connection
-        try:
-            if 'cur' in locals():
-                cur.close()
-            if 'conn' in locals():
-                conn.close()
-        except:
-            pass
+        # If we need a new event_id, generate one with maximum uniqueness
+        if not use_current_event_id:
+            max_retries = 10
+            
+            for retry in range(max_retries):
+                try:
+                    # Generate a completely unique event_id
+                    pid = os.getpid()
+                    # Use nanosecond precision timestamp + double UUID + PID + retry + large random
+                    event_id = f"$admin_rm_{int(time.time()*1000000000)}_{uuid.uuid4().hex}_{uuid.uuid4().hex[:16]}_{pid}_{retry}_{random.randint(100000000, 999999999)}"
+                    
+                    # Check uniqueness
+                    cur.execute("SELECT COUNT(*) FROM room_memberships WHERE event_id = %s", (event_id,))
+                    if cur.fetchone()[0] > 0:
+                        # Collision detected, try again with more randomness
+                        continue
+                    
+                    # Attempt update with new event_id
+                    cur.execute("""
+                        UPDATE room_memberships 
+                        SET membership = 'leave', event_id = %s
+                        WHERE room_id = %s AND user_id = %s AND membership != 'leave'
+                    """, (event_id, room_id, user_id))
+                    
+                    conn.commit()
+                    affected = cur.rowcount
+                    
+                    if affected > 0:
+                        print(f"[INFO] ✅ Successfully updated membership to 'leave' with new event_id: {event_id[:50]}...")
+                        break
+                    else:
+                        print(f"[INFO] No rows affected - member may already be removed")
+                        break
+                        
+                except Exception as update_err:
+                    error_str = str(update_err).lower()
+                    if 'duplicate key' in error_str or 'unique constraint' in error_str:
+                        print(f"[WARN] Event ID conflict (attempt {retry + 1}/{max_retries}), retrying...")
+                        conn.rollback()
+                        if retry == max_retries - 1:
+                            # Last attempt: use triple UUID for maximum uniqueness
+                            event_id = f"$admin_rm_{uuid.uuid4().hex}_{uuid.uuid4().hex}_{uuid.uuid4().hex}_{random.randint(1000000000, 9999999999)}"
+                            try:
+                                cur.execute("""
+                                    UPDATE room_memberships 
+                                    SET membership = 'leave', event_id = %s
+                                    WHERE room_id = %s AND user_id = %s AND membership != 'leave'
+                                """, (event_id, room_id, user_id))
+                                conn.commit()
+                                affected = cur.rowcount
+                                if affected > 0:
+                                    print(f"[INFO] ✅ Successfully updated with triple-UUID event_id")
+                                    break
+                            except Exception as last_err:
+                                print(f"[ERROR] Final attempt failed: {last_err}")
+                                cur.close()
+                                conn.close()
+                                raise update_err
+                        continue
+                    else:
+                        print(f"[ERROR] Database update error: {update_err}")
+                        conn.rollback()
+                        cur.close()
+                        conn.close()
+                        raise
+            
+            cur.close()
+            conn.close()
         
         if affected > 0:
             return jsonify({
