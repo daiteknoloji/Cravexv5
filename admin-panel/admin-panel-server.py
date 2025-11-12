@@ -2804,6 +2804,40 @@ def remove_room_member(room_id, user_id):
                     # Try Client API kick (requires admin to be in room and have power level)
                     if admin_in_room:
                         try:
+                            # First, try to increase admin's power level if needed
+                            # Get current power levels
+                            power_levels_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/state/m.room.power_levels'
+                            power_levels_response = requests.get(power_levels_url, headers=headers, timeout=10)
+                            
+                            if power_levels_response.status_code == 200:
+                                power_levels = power_levels_response.json().get('content', {})
+                                users = power_levels.get('users', {})
+                                kick_level = power_levels.get('kick', 50)  # Default kick level is 50
+                                
+                                # Check admin's current power level
+                                admin_power_level = users.get(admin_user_id_for_room, 0)
+                                
+                                # If admin's power level is less than kick level, try to increase it
+                                if admin_power_level < kick_level:
+                                    print(f"[INFO] Admin power level ({admin_power_level}) is less than kick level ({kick_level}), attempting to increase...")
+                                    # Set admin's power level to 100 (maximum)
+                                    users[admin_user_id_for_room] = 100
+                                    power_levels['users'] = users
+                                    
+                                    # Try to update power levels
+                                    update_power_levels_response = requests.put(
+                                        power_levels_url,
+                                        headers=headers,
+                                        json=power_levels,
+                                        timeout=10
+                                    )
+                                    
+                                    if update_power_levels_response.status_code in [200, 201, 204]:
+                                        print(f"[INFO] ✅ Admin power level increased to 100")
+                                    else:
+                                        print(f"[WARN] Failed to increase admin power level: {update_power_levels_response.status_code} - {update_power_levels_response.text[:200]}")
+                            
+                            # Now try to kick the user
                             kick_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/kick'
                             kick_response = requests.post(
                                 kick_url,
