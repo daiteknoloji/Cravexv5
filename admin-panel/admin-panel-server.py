@@ -2299,8 +2299,8 @@ def add_room_member(room_id):
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute(
-                "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id = %s AND membership = 'join'",
-                (room_id, ADMIN_USER_ID)
+                "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id IN (%s, %s) AND membership = 'join'",
+                (room_id, ADMIN_USER_ID, f'@cravexadmin:{HOMESERVER_DOMAIN}')
             )
             admin_still_in_room = cur.fetchone()[0] > 0
             
@@ -2362,12 +2362,22 @@ def add_room_member(room_id):
                 if not admin_still_in_room:
                     print(f"[WARN] Admin still not in room, trying direct join...")
                     try:
+                        # First try Client API join
                         client_join_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/join'
                         admin_client_response = requests.post(client_join_url, headers=headers, json={}, timeout=10)
                         print(f"[INFO] Admin Client API join (retry) result: {admin_client_response.status_code}")
                         if admin_client_response.status_code == 200:
                             print(f"[INFO] ✅ Admin successfully joined room (retry)!")
                             admin_still_in_room = True
+                        else:
+                            # If Client API failed, try Admin API join
+                            print(f"[WARN] Client API join failed, trying Admin API join...")
+                            admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
+                            admin_api_join_response = requests.post(admin_join_url, headers=headers, json={'user_id': admin_user_id_for_room}, timeout=10)
+                            print(f"[INFO] Admin API join (retry) result: {admin_api_join_response.status_code}")
+                            if admin_api_join_response.status_code == 200:
+                                print(f"[INFO] ✅ Admin successfully joined room via Admin API (retry)!")
+                                admin_still_in_room = True
                     except Exception as retry_err:
                         print(f"[ERROR] Admin join retry failed: {retry_err}")
             
