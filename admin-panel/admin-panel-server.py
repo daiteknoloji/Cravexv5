@@ -2741,16 +2741,48 @@ def remove_room_member(room_id, user_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Generate unique event_id using uuid
+        # Generate unique event_id using uuid - ensure it's unique
         import uuid
-        event_id = f"$admin_remove_{uuid.uuid4().hex}"
+        import time
+        max_attempts = 10
+        event_id = None
+        
+        for attempt in range(max_attempts):
+            candidate_event_id = f"$admin_remove_{int(time.time()*1000)}_{uuid.uuid4().hex[:16]}"
+            
+            # Check if this event_id already exists
+            cur.execute("""
+                SELECT COUNT(*) FROM room_memberships WHERE event_id = %s
+            """, (candidate_event_id,))
+            
+            if cur.fetchone()[0] == 0:
+                event_id = candidate_event_id
+                break
+        
+        if not event_id:
+            # Fallback: use timestamp + random
+            event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:8]}"
         
         # Update membership to 'leave'
-        cur.execute("""
-            UPDATE room_memberships 
-            SET membership = 'leave', event_id = %s
-            WHERE room_id = %s AND user_id = %s AND membership != 'leave'
-        """, (event_id, room_id, user_id))
+        # Use ON CONFLICT to handle duplicate event_id gracefully
+        try:
+            cur.execute("""
+                UPDATE room_memberships 
+                SET membership = 'leave', event_id = %s
+                WHERE room_id = %s AND user_id = %s AND membership != 'leave'
+            """, (event_id, room_id, user_id))
+        except Exception as update_err:
+            # If event_id conflict, try with a new one
+            if 'duplicate key' in str(update_err).lower() or 'unique constraint' in str(update_err).lower():
+                print(f"[WARN] Event ID conflict, generating new one: {update_err}")
+                event_id = f"$admin_remove_{int(time.time()*1000000)}_{uuid.uuid4().hex[:12]}"
+                cur.execute("""
+                    UPDATE room_memberships 
+                    SET membership = 'leave', event_id = %s
+                    WHERE room_id = %s AND user_id = %s AND membership != 'leave'
+                """, (event_id, room_id, user_id))
+            else:
+                raise
         
         conn.commit()
         
