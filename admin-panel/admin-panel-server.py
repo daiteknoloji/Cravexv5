@@ -2565,10 +2565,66 @@ def add_room_member(room_id):
 @app.route('/api/rooms/<room_id>/members/<user_id>', methods=['DELETE'])
 @login_required
 def remove_room_member(room_id, user_id):
-    """Remove a member from a room (DIRECT DATABASE)"""
+    """Remove a member from a room (DATABASE + Matrix API for sync)"""
     try:
+        # URL decode room_id and user_id
+        from urllib.parse import unquote
+        room_id = unquote(room_id)
+        user_id = unquote(user_id)
+        
+        print(f"[INFO] Removing member {user_id} from room {room_id}")
+        
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        # Check if this is a DM room (should not allow removal from DM)
+        cur.execute(
+            """
+            SELECT ej.json::json->'content'->>'is_direct'
+            FROM event_json ej
+            WHERE ej.room_id = %s 
+              AND ej.json::json->>'type' = 'm.room.create'
+            ORDER BY (ej.json::json->>'origin_server_ts')::bigint ASC
+            LIMIT 1
+            """,
+            (room_id,)
+        )
+        is_direct_row = cur.fetchone()
+        is_direct = is_direct_row[0] if is_direct_row and is_direct_row[0] else None
+        
+        # Also check member count
+        cur.execute(
+            "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND membership = 'join'",
+            (room_id,)
+        )
+        member_count = cur.fetchone()[0]
+        
+        # Check if DM
+        is_dm = False
+        if is_direct and is_direct.lower() == 'true':
+            is_dm = True
+        elif member_count == 2:
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM event_json ej
+                WHERE ej.room_id = %s 
+                  AND ej.json::json->>'type' = 'm.room.name'
+                  AND ej.json::json->'content'->>'name' IS NOT NULL
+                  AND ej.json::json->'content'->>'name' != ''
+                """,
+                (room_id,)
+            )
+            has_name = cur.fetchone()[0] > 0
+            if not has_name:
+                is_dm = True
+        
+        if is_dm:
+            cur.close()
+            conn.close()
+            return jsonify({
+                'error': 'Bu bir direkt mesaj (DM) odası. DM\'lerden üye çıkarılamaz.',
+                'success': False
+            }), 400
         
         # Check current membership status
         cur.execute("""
@@ -2592,6 +2648,99 @@ def remove_room_member(room_id, user_id):
             conn.close()
             return jsonify({'message': 'Member already removed', 'success': True})
         
+        # Get admin token for Matrix API call
+        cur.execute(
+            "SELECT token FROM access_tokens WHERE user_id IN (%s, %s) ORDER BY id DESC LIMIT 1",
+            (ADMIN_USER_ID, f'@cravexadmin:{HOMESERVER_DOMAIN}')
+        )
+        token_row = cur.fetchone()
+        admin_token = token_row[0] if token_row else None
+        
+        # Determine which admin user_id to use
+        admin_user_id_for_room = ADMIN_USER_ID
+        if admin_token:
+            cur.execute(
+                "SELECT user_id FROM access_tokens WHERE token = %s ORDER BY id DESC LIMIT 1",
+                (admin_token,)
+            )
+            token_user_row = cur.fetchone()
+            if token_user_row:
+                admin_user_id_for_room = token_user_row[0]
+        
+        cur.close()
+        conn.close()
+        
+        # Try Matrix API first (to send notification)
+        import requests
+        synapse_url = get_env_var('SYNAPSE_URL', '')
+        if not synapse_url:
+            homeserver_domain = get_env_var('HOMESERVER_DOMAIN', HOMESERVER_DOMAIN)
+            if homeserver_domain and homeserver_domain != 'localhost':
+                synapse_url = f'https://{homeserver_domain}'
+            else:
+                synapse_url = 'http://localhost:8008'
+        
+        # Auto-login if no token
+        if not admin_token:
+            admin_username = get_env_var('ADMIN_USERNAME', 'admin')
+            admin_password = get_env_var('ADMIN_PASSWORD', '')
+            
+            login_attempts = [
+                {'user': admin_username},
+                {'user': ADMIN_USER_ID},
+                {'user': 'cravexadmin'},
+                {'user': f'@cravexadmin:{HOMESERVER_DOMAIN}'}
+            ]
+            
+            if admin_password:
+                for attempt in login_attempts:
+                    try:
+                        login_response = requests.post(
+                            f'{synapse_url}/_matrix/client/v3/login',
+                            json={
+                                'type': 'm.login.password',
+                                'identifier': {'type': 'm.id.user', 'user': attempt['user']},
+                                'password': admin_password
+                            },
+                            timeout=10
+                        )
+                        
+                        if login_response.status_code == 200:
+                            admin_token = login_response.json().get('access_token')
+                            login_user_id = login_response.json().get('user_id', '')
+                            admin_user_id_for_room = login_user_id if login_user_id else ADMIN_USER_ID
+                            break
+                    except:
+                        continue
+        
+        # Try Matrix API kick/leave
+        if admin_token:
+            headers = {
+                'Authorization': f'Bearer {admin_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Try Admin API kick first
+            try:
+                kick_url = f'{synapse_url}/_synapse/admin/v1/rooms/{room_id}/kick'
+                kick_response = requests.post(
+                    kick_url,
+                    headers=headers,
+                    json={'user_id': user_id},
+                    timeout=10
+                )
+                
+                if kick_response.status_code == 200:
+                    print(f"[INFO] ✅ User kicked via Admin API: {user_id}")
+                else:
+                    print(f"[WARN] Admin API kick failed: {kick_response.status_code} - {kick_response.text[:200]}")
+            except Exception as api_err:
+                print(f"[WARN] Admin API kick error: {api_err}")
+        
+        # Update database regardless of API result
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
         # Generate unique event_id using uuid
         import uuid
         event_id = f"$admin_remove_{uuid.uuid4().hex}"
@@ -2610,13 +2759,18 @@ def remove_room_member(room_id, user_id):
         conn.close()
         
         if affected > 0:
-            return jsonify({'message': 'Member removed successfully', 'success': True})
+            return jsonify({
+                'message': f'✅ {user_id} gruptan çıkarıldı!',
+                'success': True
+            })
         else:
             return jsonify({'message': 'Member already removed', 'success': True})
         
     except Exception as e:
         print(f"[HATA] DELETE /api/rooms/{room_id}/members/{user_id} - {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'success': False}), 500
 
 @app.route('/api/users')
 @login_required
