@@ -2726,30 +2726,55 @@ def remove_room_member(room_id, user_id):
             }
             
             # Strategy 1: Try Admin API to remove user (doesn't require admin to be in room)
+            # Admin API bypasses power level checks and room membership requirements
             try:
-                # Check if admin token is an admin token (starts with 'syt_')
-                if admin_token.startswith('syt_'):
-                    # This is an admin token, try Admin API
-                    # Admin API: Use PUT /_synapse/admin/v1/rooms/{room_id}/state/{event_type}/{state_key}
-                    # to create a state event that removes the user
-                    admin_api_state_url = f'{synapse_url}/_synapse/admin/v1/rooms/{room_id}/state/m.room.member/{user_id}'
-                    admin_state_response = requests.put(
-                        admin_api_state_url,
+                # Admin API: Try DELETE /_synapse/admin/v1/rooms/{room_id}/members/{user_id} first
+                admin_api_delete_url = f'{synapse_url}/_synapse/admin/v1/rooms/{room_id}/members/{user_id}'
+                admin_delete_response = requests.delete(
+                    admin_api_delete_url,
+                    headers=headers,
+                    timeout=10
+                )
+                
+                if admin_delete_response.status_code in [200, 201, 204]:
+                    print(f"[INFO] ✅ User removed via Admin API DELETE: {user_id}")
+                    matrix_api_success = True
+                else:
+                    # Fallback: Try Admin API POST /_synapse/admin/v1/rooms/{room_id}/kick
+                    print(f"[INFO] Admin API DELETE failed: {admin_delete_response.status_code}, trying kick endpoint...")
+                    admin_api_kick_url = f'{synapse_url}/_synapse/admin/v1/rooms/{room_id}/kick'
+                    admin_kick_response = requests.post(
+                        admin_api_kick_url,
                         headers=headers,
-                        json={'membership': 'leave'},
+                        json={'user_id': user_id, 'reason': 'Removed by admin'},
                         timeout=10
                     )
                     
-                    if admin_state_response.status_code in [200, 201, 204]:
-                        print(f"[INFO] ✅ User removed via Admin API state event: {user_id}")
+                    if admin_kick_response.status_code in [200, 201, 204]:
+                        print(f"[INFO] ✅ User kicked via Admin API: {user_id}")
                         matrix_api_success = True
                     else:
-                        print(f"[WARN] Admin API state event failed: {admin_state_response.status_code} - {admin_state_response.text[:200]}")
-                        # Fallback: Try using Admin API to send a membership event directly
-                        # This requires creating a proper Matrix event
-                        print(f"[INFO] Admin API state event failed, will try Client API...")
-                else:
-                    print(f"[INFO] Token is not an admin token, trying Client API...")
+                        print(f"[WARN] Admin API kick failed: {admin_kick_response.status_code} - {admin_kick_response.text[:200]}")
+                        # Fallback: Try Admin API PUT /_synapse/admin/v1/rooms/{room_id}/state
+                        print(f"[INFO] Admin API kick failed, trying state endpoint...")
+                        admin_api_state_url = f'{synapse_url}/_synapse/admin/v1/rooms/{room_id}/state'
+                        admin_state_response = requests.put(
+                            admin_api_state_url,
+                            headers=headers,
+                            json={
+                                'type': 'm.room.member',
+                                'state_key': user_id,
+                                'content': {'membership': 'leave'}
+                            },
+                            timeout=10
+                        )
+                        
+                        if admin_state_response.status_code in [200, 201, 204]:
+                            print(f"[INFO] ✅ User removed via Admin API state: {user_id}")
+                            matrix_api_success = True
+                        else:
+                            print(f"[WARN] Admin API state failed: {admin_state_response.status_code} - {admin_state_response.text[:200]}")
+                            print(f"[INFO] Admin API methods failed, will try Client API...")
             except Exception as admin_api_err:
                 print(f"[WARN] Admin API error: {admin_api_err}")
             
