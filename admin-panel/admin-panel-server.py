@@ -1315,17 +1315,31 @@ def login():
                 print(f"[DEBUG] Matrix login response: {login_response.text[:200]}")
                 
                 if login_response.status_code == 200:
-                    # Success! Matrix login worked - check if user is admin
+                    # Success! Matrix login worked - check if user is authorized
                     login_data = login_response.json()
                     matrix_user_id = login_data.get('user_id', '')
                     
-                    # Check if user is admin (has admin privileges in Synapse)
-                    # For now, allow any Matrix user to login to admin panel
-                    # You can add additional checks here if needed
+                    # Only allow cravexadmin and can.cakir to login
+                    allowed_users = [
+                        'cravexadmin',
+                        'can.cakir',
+                        f'@cravexadmin:{HOMESERVER_DOMAIN}',
+                        f'@can.cakir:{HOMESERVER_DOMAIN}'
+                    ]
+                    
+                    # Check if user is in allowed list (check both username and full user_id)
+                    username_match = username.lower() in [u.lower() for u in allowed_users]
+                    user_id_match = matrix_user_id.lower() in [u.lower() for u in allowed_users]
+                    
+                    if not (username_match or user_id_match):
+                        print(f"[WARN] ❌ Unauthorized login attempt: {username} / {matrix_user_id}")
+                        return render_template_string(LOGIN_TEMPLATE, error='Bu admin paneline erişim yetkiniz yok. Sadece yetkili kullanıcılar giriş yapabilir.')
+                    
+                    # User is authorized - allow login
                     session['logged_in'] = True
                     session['username'] = username
                     session['matrix_user_id'] = matrix_user_id
-                    print(f"[INFO] ✅ Matrix login successful for {matrix_user_id}")
+                    print(f"[INFO] ✅ Matrix login successful for authorized user: {matrix_user_id}")
                     return redirect(url_for('index'))
                 else:
                     # Store error for display
@@ -2041,20 +2055,33 @@ def add_room_member(room_id):
         
         # Note: We'll still try to send invite even if user is in room, to ensure notification
         
-        # Get admin token for Matrix API call
+        # Get admin token for Matrix API call - try both ADMIN_USER_ID and cravexadmin
         cur.execute(
-            "SELECT token FROM access_tokens WHERE user_id = %s ORDER BY id DESC LIMIT 1",
-            (ADMIN_USER_ID,)
+            "SELECT token FROM access_tokens WHERE user_id IN (%s, %s) ORDER BY id DESC LIMIT 1",
+            (ADMIN_USER_ID, f'@cravexadmin:{HOMESERVER_DOMAIN}')
         )
         token_row = cur.fetchone()
         admin_token = token_row[0] if token_row else None
         
-        # Check if admin is already in room (before closing connection)
+        # Check if admin is already in room (before closing connection) - check both ADMIN_USER_ID and cravexadmin
         cur.execute(
-            "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id = %s AND membership = 'join'",
-            (room_id, ADMIN_USER_ID)
+            "SELECT COUNT(*) FROM room_memberships WHERE room_id = %s AND user_id IN (%s, %s) AND membership = 'join'",
+            (room_id, ADMIN_USER_ID, f'@cravexadmin:{HOMESERVER_DOMAIN}')
         )
         admin_in_room = cur.fetchone()[0] > 0
+        
+        # Determine which admin user_id to use (prefer cravexadmin if token exists for it)
+        admin_user_id_for_room = ADMIN_USER_ID  # Default
+        if admin_token:
+            # Check which user_id the token belongs to
+            cur.execute(
+                "SELECT user_id FROM access_tokens WHERE token = %s ORDER BY id DESC LIMIT 1",
+                (admin_token,)
+            )
+            token_user_row = cur.fetchone()
+            if token_user_row:
+                admin_user_id_for_room = token_user_row[0]
+                print(f"[DEBUG] Using admin user_id: {admin_user_id_for_room} for room operations")
         
         cur.close()
         conn.close()
@@ -2103,32 +2130,40 @@ def add_room_member(room_id):
                         
                         if login_response.status_code == 200:
                             admin_token = login_response.json().get('access_token')
+                            login_user_id = login_response.json().get('user_id', '')
                             print(f"[INFO] Auto-login successful for member add! Token obtained: {admin_token[:20]}...")
+                            print(f"[INFO] Logged in as: {login_user_id}")
                             
-                            # Save token to database for future use
+                            # Save token to database for future use - use the actual logged-in user_id
                             try:
                                 conn_token = get_db_connection()
                                 cur_token = conn_token.cursor()
+                                # Use the actual logged-in user_id (could be cravexadmin or can.cakir)
+                                token_user_id = login_user_id if login_user_id else ADMIN_USER_ID
+                                
                                 # Check if token already exists
                                 cur_token.execute(
                                     "SELECT id FROM access_tokens WHERE user_id = %s AND token = %s LIMIT 1",
-                                    (ADMIN_USER_ID, admin_token)
+                                    (token_user_id, admin_token)
                                 )
                                 if not cur_token.fetchone():
                                     # Insert new token
                                     cur_token.execute(
                                         "INSERT INTO access_tokens (user_id, token) VALUES (%s, %s)",
-                                        (ADMIN_USER_ID, admin_token)
+                                        (token_user_id, admin_token)
                                     )
                                     conn_token.commit()
-                                    print(f"[INFO] Admin token saved to database for future use")
+                                    print(f"[INFO] Admin token saved to database for {token_user_id}")
                                 else:
-                                    print(f"[INFO] Admin token already exists in database")
+                                    print(f"[INFO] Admin token already exists in database for {token_user_id}")
                                 cur_token.close()
                                 conn_token.close()
                             except Exception as save_error:
                                 print(f"[WARN] Could not save admin token to database: {save_error}")
                             
+                            # Update admin_user_id_for_room after successful login
+                            admin_user_id_for_room = login_user_id if login_user_id else ADMIN_USER_ID
+                            print(f"[DEBUG] Updated admin_user_id_for_room to: {admin_user_id_for_room}")
                             break  # Success, exit loop
                         else:
                             print(f"[WARN] Auto-login failed for {attempt['user']}: {login_response.status_code} - {login_response.text[:100]}")
@@ -2175,7 +2210,7 @@ def add_room_member(room_id):
                             'Content-Type': 'application/json'
                         }
                         invite_admin_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
-                        invite_admin_response = requests.post(invite_admin_url, headers=creator_headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                        invite_admin_response = requests.post(invite_admin_url, headers=creator_headers, json={'user_id': admin_user_id_for_room}, timeout=10)
                         print(f"[INFO] Creator invite admin result: {invite_admin_response.status_code} - {invite_admin_response.text[:200]}")
                         
                         if invite_admin_response.status_code == 200:
@@ -2192,7 +2227,7 @@ def add_room_member(room_id):
                                 # Try Admin API as fallback
                                 print(f"[WARN] Client API failed, trying Admin API...")
                                 admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
-                                admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                                admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': admin_user_id_for_room}, timeout=10)
                                 print(f"[INFO] Admin API join result: {admin_response.status_code} - {admin_response.text[:200]}")
                                 if admin_response.status_code == 200:
                                     admin_in_room = True
@@ -2214,7 +2249,7 @@ def add_room_member(room_id):
                         # If Client API fails, try Admin API
                         print(f"[WARN] Client API failed, trying Admin API...")
                         admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
-                        admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                        admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': admin_user_id_for_room}, timeout=10)
                         print(f"[INFO] Admin API join result: {admin_response.status_code} - {admin_response.text[:200]}")
                         
                         if admin_response.status_code == 200:
@@ -2295,7 +2330,7 @@ def add_room_member(room_id):
                             'Content-Type': 'application/json'
                         }
                         invite_admin_url = f'{synapse_url}/_matrix/client/v3/rooms/{room_id}/invite'
-                        invite_admin_response = requests.post(invite_admin_url, headers=creator_headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                        invite_admin_response = requests.post(invite_admin_url, headers=creator_headers, json={'user_id': admin_user_id_for_room}, timeout=10)
                         print(f"[INFO] Creator invite admin result: {invite_admin_response.status_code} - {invite_admin_response.text[:200]}")
                         
                         if invite_admin_response.status_code == 200:
@@ -2312,7 +2347,7 @@ def add_room_member(room_id):
                                 # Try Admin API as fallback
                                 print(f"[WARN] Client API failed, trying Admin API...")
                                 admin_join_url = f'{synapse_url}/_synapse/admin/v1/join/{room_id}'
-                                admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': ADMIN_USER_ID}, timeout=10)
+                                admin_response = requests.post(admin_join_url, headers=headers, json={'user_id': admin_user_id_for_room}, timeout=10)
                                 print(f"[INFO] Admin API join result: {admin_response.status_code} - {admin_response.text[:200]}")
                                 if admin_response.status_code == 200:
                                     admin_still_in_room = True
@@ -2420,7 +2455,7 @@ def add_room_member(room_id):
                     INSERT INTO room_memberships (event_id, user_id, sender, room_id, membership)
                     VALUES (%s, %s, %s, %s, 'join')
                     ON CONFLICT DO NOTHING
-                """, (event_id, user_id, ADMIN_USER_ID, room_id))
+                """, (event_id, user_id, admin_user_id_for_room, room_id))
                 conn.commit()
                 cur.close()
                 conn.close()
@@ -2505,7 +2540,7 @@ def add_room_member(room_id):
                     INSERT INTO room_memberships (event_id, user_id, sender, room_id, membership)
                     VALUES (%s, %s, %s, %s, 'join')
                     ON CONFLICT DO NOTHING
-                """, (event_id, user_id, ADMIN_USER_ID, room_id))
+                """, (event_id, user_id, admin_user_id_for_room, room_id))
                 
                 conn.commit()
                 cur.close()
